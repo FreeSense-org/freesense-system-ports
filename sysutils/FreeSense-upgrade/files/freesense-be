@@ -1,0 +1,146 @@
+#!/usr/local/bin/php -f
+<?php
+/* Apache-2.0 — FreeSense boot environment control interface. */
+
+function fail(string $message, int $code = 1): never {
+	fwrite(STDERR, $message . PHP_EOL);
+	exit($code);
+}
+
+function run(array $argv, ?string &$output = null): int {
+	$cmd = implode(' ', array_map('escapeshellarg', $argv));
+	$lines = [];
+	exec($cmd . ' 2>&1', $lines, $rc);
+	$output = implode("\n", $lines);
+	return $rc;
+}
+
+function valid_name(string $name): bool {
+	return preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/D', $name) === 1;
+}
+
+function list_bes(): array {
+	if (run(['/sbin/bectl', 'list', '-H'], $raw) !== 0) {
+		return [];
+	}
+	$result = [];
+	foreach (preg_split('/\R/', trim($raw)) as $line) {
+		$fields = preg_split('/\t+|\s{2,}/', trim($line), 5);
+		if (count($fields) < 5) continue;
+		[$name, $active, $mountpoint, $space, $created] = $fields;
+		$result[$name] = [
+			'name' => $name,
+			'active_now' => str_contains($active, 'N'),
+			'active_reboot' => str_contains($active, 'R'),
+			'active_once' => str_contains($active, 'T'),
+			'mountpoint' => $mountpoint === '-' ? null : $mountpoint,
+			'space' => $space,
+			'created' => $created,
+		];
+	}
+	return $result;
+}
+
+function root_dataset(): string {
+	run(['/sbin/mount', '-p'], $raw);
+	foreach (preg_split('/\R/', $raw) as $line) {
+		$f = preg_split('/\s+/', trim($line));
+		if (count($f) >= 3 && $f[1] === '/' && $f[2] === 'zfs') return $f[0];
+	}
+	return '';
+}
+
+function be_root(): string {
+	$root = root_dataset();
+	$pos = strpos($root, '/ROOT/');
+	return $pos === false ? '' : substr($root, 0, $pos + 5);
+}
+
+function metadata(string $name): array {
+	$root = be_root();
+	if ($root === '') return [];
+	$props = ['version','description','origin','health','rollback','created','lastboot','verifydeadline','rollbackattempted'];
+	$out = [];
+	foreach ($props as $prop) {
+		run(['/sbin/zfs', 'get', '-H', '-o', 'value', "freesense:$prop", "$root/$name"], $value);
+		$value = trim($value);
+		if ($value !== '' && $value !== '-') $out[$prop] = $value;
+	}
+	return $out;
+}
+
+function set_prop(string $name, string $key, string $value): void {
+	$root = be_root();
+	if ($root === '' || run(['/sbin/zfs', 'set', "freesense:$key=$value", "$root/$name"], $out) !== 0) {
+		fail($out ?: 'Unable to set boot environment metadata');
+	}
+}
+
+function status(): array {
+	$compatible = run(['/sbin/bectl', 'check'], $out) === 0;
+	return ['compatible' => $compatible, 'root_dataset' => root_dataset(), 'boot_environment_root' => be_root()];
+}
+
+if (function_exists('posix_geteuid') && posix_geteuid() !== 0) fail('Root privileges are required.');
+$command = $argv[1] ?? 'status';
+$bes = list_bes();
+foreach ($bes as $beName => &$beData) $beData['metadata'] = metadata($beName);
+unset($beData);
+
+if ($command === 'status') {
+	echo json_encode(status(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL;
+	exit(0);
+}
+if ($command === 'list') {
+	echo json_encode(['status' => status(), 'environments' => array_values($bes)], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL;
+	exit(0);
+}
+
+$name = $argv[2] ?? '';
+if (!valid_name($name)) fail('Invalid boot environment name.');
+$exists = isset($bes[$name]);
+$active = $exists && $bes[$name]['active_now'];
+$protected = $exists && (($bes[$name]['metadata']['health'] ?? '') === 'pending');
+
+switch ($command) {
+case 'create':
+	if ($exists) fail('Boot environment already exists.');
+	if (run(['/sbin/bectl', 'create', '-r', $name], $out) !== 0) fail($out);
+	set_prop($name, 'origin', 'manual');
+	set_prop($name, 'health', 'manual');
+	break;
+case 'clone':
+	$source = $argv[3] ?? '';
+	if ($exists || !valid_name($source) || !isset($bes[$source])) fail('Invalid clone source or destination.');
+	if (run(['/sbin/bectl', 'create', '-r', '-e', $source, $name], $out) !== 0) fail($out);
+	set_prop($name, 'origin', 'manual');
+	set_prop($name, 'health', 'manual');
+	break;
+case 'rename':
+	$new = $argv[3] ?? '';
+	if (!$exists || $active || $protected || !valid_name($new) || isset($bes[$new])) fail('Boot environment cannot be renamed.');
+	if (run(['/sbin/bectl', 'rename', $name, $new], $out) !== 0) fail($out);
+	break;
+case 'destroy':
+	if (!$exists || $active || $protected || $bes[$name]['active_reboot'] || $bes[$name]['active_once']) fail('Boot environment is protected.');
+	if (run(['/sbin/bectl', 'destroy', '-o', $name], $out) !== 0) fail($out);
+	break;
+case 'activate':
+	if (!$exists) fail('Unknown boot environment.');
+	if (run(['/sbin/bectl', 'activate', $name], $out) !== 0) fail($out);
+	break;
+case 'activate-once':
+	if (!$exists) fail('Unknown boot environment.');
+	if (run(['/sbin/bectl', 'activate', '-t', $name], $out) !== 0) fail($out);
+	break;
+case 'describe':
+	if (!$exists) fail('Unknown boot environment.');
+	$description = trim(implode(' ', array_slice($argv, 3)));
+	if (strlen($description) > 256 || preg_match('/[\x00-\x1f]/', $description)) fail('Invalid description.');
+	set_prop($name, 'description', $description ?: '-');
+	break;
+default:
+	fail('Unknown command.');
+}
+
+echo json_encode(['ok' => true, 'command' => $command, 'name' => $name]) . PHP_EOL;

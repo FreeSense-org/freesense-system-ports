@@ -1,0 +1,65 @@
+#!/usr/local/bin/php -f
+<?php
+/* Apache-2.0 — read-only FreeSense ZFS status interface. */
+
+function command(array $args): array {
+	$cmd = implode(' ', array_map('escapeshellarg', $args));
+	exec($cmd . ' 2>/dev/null', $out, $rc);
+	return [$rc, $out];
+}
+
+[$rc, $rows] = command(['/sbin/zpool', 'list', '-Hp', '-o', 'name,size,alloc,free,frag,health']);
+if ($rc !== 0) {
+	echo json_encode(['zfs_active' => false, 'pools' => []]) . PHP_EOL;
+	exit(0);
+}
+
+$pools = [];
+foreach ($rows as $row) {
+	$f = explode("\t", $row);
+	if (count($f) < 6) continue;
+	[$name, $size, $alloc, $free, $frag, $health] = $f;
+	[$src, $statusLines] = command(['/sbin/zpool', 'status', '-p', $name]);
+	$statusText = implode("\n", $statusLines);
+	$scan = null;
+	if (preg_match('/^\s*scan:\s*(.+)$/m', $statusText, $m)) $scan = trim($m[1]);
+	$errors = null;
+	if (preg_match('/^errors:\s*(.+)$/m', $statusText, $m)) $errors = trim($m[1]);
+	$devices = [];
+	$inConfig = false;
+	foreach ($statusLines as $line) {
+		if (preg_match('/^\s*NAME\s+STATE\s+READ\s+WRITE\s+CKSUM/', $line)) { $inConfig = true; continue; }
+		if (!$inConfig || trim($line) === '' || str_starts_with(trim($line), 'errors:')) continue;
+		if (preg_match('/^\s+(\S+)\s+(ONLINE|DEGRADED|FAULTED|OFFLINE|REMOVED|UNAVAIL)\s+(\d+)\s+(\d+)\s+(\d+)/', $line, $m)) {
+			$devices[] = ['name' => $m[1], 'state' => $m[2], 'read_errors' => (int)$m[3], 'write_errors' => (int)$m[4], 'checksum_errors' => (int)$m[5]];
+		}
+	}
+	$pools[] = [
+		'name' => $name, 'size' => (int)$size, 'allocated' => (int)$alloc,
+		'free' => (int)$free, 'fragmentation' => (int)$frag, 'health' => $health,
+		'capacity_percent' => (int)$size > 0 ? round(((int)$alloc / (int)$size) * 100, 1) : 0,
+		'scan' => $scan, 'errors' => $errors, 'devices' => $devices,
+	];
+}
+
+[$berc, $beRows] = command(['/sbin/bectl', 'list', '-H']);
+$bootEnvironment = ['supported' => $berc === 0, 'count' => 0, 'current' => null, 'pending' => false];
+if ($berc === 0) {
+	$bootEnvironment['count'] = count($beRows);
+	[$mrc, $mountRows] = command(['/sbin/mount', '-p']);
+	$activeDataset = '';
+	foreach ($mountRows as $mountRow) {
+		$mf = preg_split('/\s+/', trim($mountRow));
+		if (count($mf) >= 3 && $mf[1] === '/' && $mf[2] === 'zfs') $activeDataset = $mf[0];
+	}
+	foreach ($beRows as $line) {
+		$f = preg_split('/\t+|\s{2,}/', trim($line), 3);
+		if (count($f) >= 2 && str_contains($f[1], 'N')) {
+			$bootEnvironment['current'] = $f[0];
+			[$prc, $prop] = command(['/sbin/zfs', 'get', '-H', '-o', 'value', 'freesense:health', $activeDataset]);
+			$bootEnvironment['pending'] = $prc === 0 && trim($prop[0] ?? '') === 'pending';
+		}
+	}
+}
+
+echo json_encode(['zfs_active' => true, 'generated_at' => gmdate(DATE_ATOM), 'pools' => $pools, 'boot_environment' => $bootEnvironment], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL;

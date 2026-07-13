@@ -1,0 +1,3 @@
+Compatibility marker whose version is derived from the FreeSense major.minor
+product version. Optional packages depend on the exact marker version so pkg
+cannot install them on an incompatible operating-system train.

@@ -1,0 +1,7 @@
+FreeSense static repository client.
+
+Materializes the FreeSense pkg repo channels (devel, release) from a small
+public manifest into the per-branch repo confs used by the GUI branch selector
+and the repo-setup script. Replaces Netgate's proprietary, entitlement-based
+FreeSense-repoc; FreeSense channels are public and fingerprint-signed, so no
+authentication or phone-home is required.

@@ -1,0 +1,201 @@
+#!/bin/sh
+#
+# FreeSense-repoc — FreeSense static repository client
+#
+# part of FreeSense (https://freesense.org)
+# Copyright (c) 2026 FreeSense contributors
+# All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# This is the FreeSense replacement for Netgate's proprietary, gitlab-hosted
+# pfSense-repoc binary. The Netgate client authenticated to Netgate's servers,
+# fetched per-DEVICE repo entitlements + client certificates, and wrote the
+# per-branch pkg repo confs into the product's pkg_repos_path.
+#
+# FreeSense has no entitlement and no auth: every channel is a plain, public,
+# fingerprint-signed pkg repo on pkg.freesense.org. So this client simply
+# materializes the list of channels described by a small public MANIFEST into
+# the same per-branch conf/name/descr/abi files that the GUI (pkg_list_repos)
+# and <PRODUCT>-repo-setup already consume.
+#
+# Manifest schema 2 is JSON. Each channel selects one independently published
+# system repository and one major.minor optional-package train. The selected
+# channel therefore controls OS updates without restamping or rebuilding the
+# optional catalog.
+#
+# Usage: FreeSense-repoc [-N] [-l] [-f] [-h]
+#   -N   sync repo confs from the manifest (this is the default action; -N just
+#        signals "new-fstyle" for compatibility with <PRODUCT>-repo-setup)
+#   -l   local only: use the baked manifest, never touch the network
+#   -f   print supported feature flags and exit
+#   -h   show this help and exit
+
+set -u
+
+PHP="/usr/local/bin/php"
+READ_GLOBAL="/usr/local/sbin/read_global_var"
+
+read_global() {
+	# read_global() <var> <fallback>
+	if [ -x "${PHP}" ] && [ -r "${READ_GLOBAL}" ]; then
+		"${PHP}" -n "${READ_GLOBAL}" "${1}" "${2}" 2>/dev/null
+	else
+		echo "${2}"
+	fi
+}
+
+# Product + paths. Env overrides let the BUILDER run this offline against a
+# staging tree (no php / chroot needed at build time).
+PRODUCT="${PRODUCT:-$(read_global product_name FreeSense)}"
+REPOS_DIR="${REPOS_DIR:-$(read_global pkg_repos_path "/usr/local/etc/${PRODUCT}/pkg/repos")}"
+SHARE_DIR="${SHARE_DIR:-/usr/local/share/${PRODUCT}}"
+ARCH="${ARCH:-$(uname -p)}"
+MANIFEST_URL="${MANIFEST_URL:-https://pkg.freesense.org/repos.manifest.json}"
+MANIFEST_LOCAL="${MANIFEST_LOCAL:-${SHARE_DIR}/repos.manifest.json}"
+FETCH_TIMEOUT="${FETCH_TIMEOUT:-15}"
+
+usage() {
+	cat <<EOF
+Usage: $(basename "$0") [-N] [-l] [-f] [-h]
+  -N   sync repo confs from the channel manifest (default action)
+  -l   local only: use the baked manifest, never touch the network
+  -f   print supported feature flags and exit
+  -h   show this help and exit
+EOF
+}
+
+err() { echo "$@" >&2; }
+
+NOFETCH=""
+while getopts "Nlfh" _o 2>/dev/null; do
+	case "${_o}" in
+	N)	: ;;	# new-fstyle is our only mode
+	l)	NOFETCH=1 ;;
+	f)	echo "repodir-new-fstyle"; echo "osversion"; exit 0 ;;
+	h)	usage; exit 0 ;;
+	*)	: ;;
+	esac
+done
+
+# Resolve the manifest: prefer the live public one, fall back to the baked copy.
+MANIFEST=""
+MANIFEST_TMP=""
+if [ -z "${NOFETCH}" ] && command -v curl >/dev/null 2>&1; then
+	MANIFEST_TMP="$(mktemp -t fs-repoc 2>/dev/null || echo "/tmp/fs-repoc.$$")"
+	if curl -fsS --max-time "${FETCH_TIMEOUT}" -o "${MANIFEST_TMP}" "${MANIFEST_URL}" 2>/dev/null \
+	    && [ -s "${MANIFEST_TMP}" ]; then
+		MANIFEST="${MANIFEST_TMP}"
+	else
+		rm -f "${MANIFEST_TMP}" 2>/dev/null
+		MANIFEST_TMP=""
+	fi
+fi
+if [ -z "${MANIFEST}" ] && [ -r "${MANIFEST_LOCAL}" ]; then
+	MANIFEST="${MANIFEST_LOCAL}"
+fi
+if [ -z "${MANIFEST}" ]; then
+	err "FreeSense-repoc: no manifest available (tried ${MANIFEST_URL} and ${MANIFEST_LOCAL})"
+	exit 1
+fi
+
+mkdir -p "${REPOS_DIR}" 2>/dev/null
+
+# Does any channel already claim the default marker? The installer seeds the
+# box's OWN channel as default, and we never override an existing choice.
+HAVE_DEFAULT=""
+for _d in "${REPOS_DIR}/${PRODUCT}-repo-"*.default; do
+	[ -e "${_d}" ] && { HAVE_DEFAULT=1; break; }
+done
+
+ROWS="${MANIFEST}"
+ROWS_TMP=""
+if [ "$(head -c 1 "${MANIFEST}" 2>/dev/null)" = "{" ]; then
+	[ -x "${PHP}" ] || {
+		err "FreeSense-repoc: PHP is required to parse repository manifest schema 2"
+		exit 1
+	}
+	ROWS_TMP="$(mktemp -t fs-repoc-rows 2>/dev/null || echo "/tmp/fs-repoc-rows.$$")"
+	"${PHP}" -n -r '
+$doc = json_decode(file_get_contents($argv[1]), true);
+if (!is_array($doc) || ($doc["schema"] ?? 0) !== 2 || !is_array($doc["channels"] ?? null)) exit(2);
+foreach ($doc["channels"] as $c) {
+    $fields = ["name", "description", "server", "system_channel", "package_train", "abi", "altabi"];
+    foreach ($fields as $f) if (!isset($c[$f]) || !is_string($c[$f]) || $c[$f] === "") exit(3);
+    $systemServer = isset($c["system_server"]) && is_string($c["system_server"]) ? $c["system_server"] : $c["server"];
+    $packagesServer = isset($c["packages_server"]) && is_string($c["packages_server"]) ? $c["packages_server"] : $c["server"];
+    $row = [$c["name"], $c["description"], $systemServer, $packagesServer,
+        $c["system_channel"], $c["package_train"], $c["abi"], $c["altabi"],
+        !empty($c["default"]) ? "yes" : "no"];
+    foreach ($row as &$v) $v = str_replace(["|", "\r", "\n"], "", (string)$v);
+    echo implode("|", $row), "\n";
+}
+' "${MANIFEST}" >"${ROWS_TMP}" || {
+		rm -f "${ROWS_TMP}" 2>/dev/null
+		err "FreeSense-repoc: invalid repository manifest schema 2"
+		exit 1
+	}
+	ROWS="${ROWS_TMP}"
+fi
+
+COUNT=0
+while IFS='|' read -r name descr system_server packages_server system_channel package_train abi altabi dflt; do
+	# Strip surrounding whitespace from the key field; skip comments/blanks.
+	name="$(echo "${name}" | tr -d '[:space:]')"
+	case "${name}" in ''|'#'*) continue ;; esac
+	[ -n "${system_server}" ] && [ -n "${packages_server}" ] \
+	    && [ -n "${system_channel}" ] && [ -n "${package_train}" ] || continue
+	dflt="$(echo "${dflt:-}" | tr -d '[:space:]')"
+
+	base="${REPOS_DIR}/${PRODUCT}-repo-${name}"
+	system_url="${system_server%/}/repos/system/${system_channel}/${ARCH}"
+	packages_url="${packages_server%/}/repos/packages/${package_train}/${ARCH}"
+	cat > "${base}.conf" <<EOF
+FreeBSD: { enabled: no }
+FreeBSD-kmods: { enabled: no }
+
+${PRODUCT}: {
+  url: "${system_url}",
+  mirror_type: "none",
+  signature_type: "fingerprints",
+  fingerprints: "/usr/local/share/${PRODUCT}/keys/system",
+  priority: 100,
+  enabled: yes
+}
+
+${PRODUCT}-packages: {
+  url: "${packages_url}",
+  mirror_type: "none",
+  signature_type: "fingerprints",
+  fingerprints: "/usr/local/share/${PRODUCT}/keys/packages",
+  priority: 50,
+  enabled: yes
+}
+EOF
+	printf '%s' "${name}" > "${base}.name"
+	printf '%s\n' "${descr:-${name}}" > "${base}.descr"
+	printf '%s\n' "${abi:-FreeBSD:16:${ARCH}}" > "${base}.abi"
+	printf '%s\n' "${altabi:-freebsd:16:x86:64}" > "${base}.altabi"
+
+	# Only seed the default marker if nothing else claims it yet.
+	if [ -z "${HAVE_DEFAULT}" ] && [ "${dflt}" = "yes" ]; then
+		: > "${base}.default"
+		HAVE_DEFAULT=1
+	fi
+
+	COUNT=$((COUNT + 1))
+done < "${ROWS}"
+
+[ -n "${MANIFEST_TMP}" ] && rm -f "${MANIFEST_TMP}" 2>/dev/null
+[ -n "${ROWS_TMP}" ] && rm -f "${ROWS_TMP}" 2>/dev/null
+
+if [ "${COUNT}" -le 0 ]; then
+	err "FreeSense-repoc: manifest had no usable channels"
+	exit 1
+fi
+
+exit 0

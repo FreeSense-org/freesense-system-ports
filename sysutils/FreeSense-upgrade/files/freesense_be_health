@@ -1,0 +1,63 @@
+#!/bin/sh
+# PROVIDE: freesense_be_health
+# REQUIRE: LOGIN
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="freesense_be_health"
+start_cmd="freesense_be_health_start"
+stop_cmd=":"
+
+prop_get() { /sbin/zfs get -H -o value "freesense:$2" "$1" 2>/dev/null; }
+prop_set() { /sbin/zfs set "freesense:$2=$3" "$1" >/dev/null 2>&1; }
+
+freesense_be_health_start()
+{
+	/sbin/bectl check >/dev/null 2>&1 || return 0
+	active=$(/sbin/bectl list -H | /usr/bin/awk 'index($2,"N") {print $1; exit}')
+	dataset=$(/sbin/mount -p | /usr/bin/awk '$2 == "/" && $3 == "zfs" {print $1; exit}')
+	[ -n "$active" ] && [ "$(prop_get "$dataset" health)" = "pending" ] || return 0
+	rollback=$(prop_get "$dataset" rollback)
+	deadline=$(prop_get "$dataset" verifydeadline)
+	case "$deadline" in ''|-) deadline=300 ;; esac
+	automatic=$(/usr/local/sbin/read_xml_tag.sh string system/bootenv/automatic_rollback)
+	if [ "$automatic" = "false" ]; then
+		/sbin/bectl activate "$active" >/dev/null 2>&1 || return 1
+		prop_set "$dataset" health healthy
+		return 0
+	fi
+
+	ok=0 elapsed=0
+	while [ "$elapsed" -lt "$deadline" ]; do
+		if /usr/local/bin/xmllint --noout /cf/conf/config.xml >/dev/null 2>&1 \
+		    && /usr/bin/pgrep -q php-fpm \
+		    && /sbin/pfctl -sr >/dev/null 2>&1 \
+		    && [ ! -e /deferred_pkg_install ]; then
+			ok=$((ok + 1))
+			[ "$ok" -ge 3 ] && break
+		else
+			ok=0
+		fi
+		/bin/sleep 20
+		elapsed=$((elapsed + 20))
+	done
+
+	if [ "$ok" -ge 3 ]; then
+		/sbin/bectl activate "$active" >/dev/null 2>&1 || return 1
+		prop_set "$dataset" health healthy
+		prop_set "$dataset" lastboot "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+		prop_set "$dataset" rollback -
+		return 0
+	fi
+
+	[ -n "$rollback" ] && [ "$rollback" != "-" ] || return 1
+	[ "$(prop_get "$dataset" rollbackattempted)" = "yes" ] && return 1
+	prop_set "$dataset" health failed
+	prop_set "$dataset" rollbackattempted yes
+	/sbin/bectl activate "$rollback" >/dev/null 2>&1 || return 1
+	/sbin/shutdown -r now
+}
+
+load_rc_config "$name"
+run_rc_command "$1"

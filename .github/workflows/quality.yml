@@ -1,0 +1,35 @@
+name: System ports quality
+
+on:
+  pull_request:
+  push:
+    branches: [main, "RELENG_*"]
+
+permissions:
+  contents: read
+
+jobs:
+  boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Enforce repository boundary
+        run: python3 tools/boundary_audit.py
+      - name: Reject credentials
+        run: |
+          if git grep -IEn '(^[[:space:]]*-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----[[:space:]]*$|R2_SECRET_ACCESS_KEY[=:][[:space:]]*[^$<{])'; then
+            echo 'Potential credential material found' >&2
+            exit 1
+          fi
+      - name: Reject vendor infrastructure dependencies
+        run: |
+          if git grep -IEn '(https?://[^[:space:]]*netgate\.com|(?:files|packages(-beta)?|gitlab|codesigner)\.netgate\.com|\.nyi\.netgate\.com)' -- . ':!NOTICE' ':!*.md'; then
+            echo 'Active Netgate infrastructure reference found' >&2
+            exit 1
+          fi
+      - name: PHP and shell syntax
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -yq php-cli
+          find . -type f \( -name '*.php' -o -name '*.inc' \) -print0 | xargs -0 -r -n1 php -l
+          find . -type f \( -name 'pkg-install.in' -o -name 'pkg-deinstall.in' \) -print0 | xargs -0 -r -n1 sh -n
