@@ -30,6 +30,10 @@ if [ -z "${INSTALLED_VERSION}" ] && [ -r "${INSTALLED_VERSION_FILE}" ]; then
 	IFS= read -r INSTALLED_VERSION <"${INSTALLED_VERSION_FILE}" || true
 fi
 [ -n "${INSTALLED_VERSION}" ] || INSTALLED_VERSION="0.0.0"
+# /etc/version carries the image lifecycle suffix (for example,
+# 1.0.0-RELEASE or 1.1.0-DEVELOPMENT). Channel versions are canonical
+# semantic versions, so compare the numeric portion only.
+INSTALLED_VERSION="${INSTALLED_VERSION%%-*}"
 
 usage() {
 	cat <<EOF
