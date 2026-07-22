@@ -104,6 +104,23 @@ def v2_payload(**kwargs: object) -> dict[str, object]:
     return payload
 
 
+def v3_payload() -> dict[str, object]:
+    payload = v2_payload()
+    payload["schema_version"] = "freesense.channels/v3"
+    devel = payload["channels"]["devel"]
+    devel["version"] = "1.1.0"
+    stable = complete_channel(
+        "stable", "FreeSense 1.0.0 stable", "1.0", False,
+        STABLE_SYSTEM_SHA, STABLE_PACKAGES_SHA, 6, 4,
+    )
+    stable["version"] = "1.0.0"
+    stable["system"]["freebsd_pin_id"] = FREEBSD_PIN
+    stable["packages"]["freebsd_pin_id"] = FREEBSD_PIN
+    stable["packages"]["built_against_system"] = STABLE_SYSTEM_SHA
+    payload["channels"]["stable"] = stable
+    return payload
+
+
 def stable_complete_devel_pending_payload() -> dict[str, object]:
     devel = complete_channel("devel", "Development version", "1.1", True)
     devel.pop("packages")
@@ -240,6 +257,7 @@ class RepocSafetyTests(unittest.TestCase):
         invalid_envelope: bool = False,
         local_only: bool = False,
         selected: str | None = None,
+        installed_version: str = "1.0.0-RELEASE",
         fail_swap: bool = False,
         lock_hold: float = 0,
     ) -> tuple[subprocess.CompletedProcess[str], Path, Path, Path, bytes]:
@@ -321,6 +339,7 @@ exec "$REAL_MV" "$@"
                 "FAKE_CURL_FAIL": "1" if fetch_failure else "0",
                 "FAKE_MV_FAIL_NEW": "1" if fail_swap else "0",
                 "REAL_MV": self.real_mv,
+                "INSTALLED_VERSION": installed_version.split("-", 1)[0],
             }
         )
         command = [self.shell, REPOC]
@@ -652,6 +671,43 @@ exec "$REAL_MV" "$@"
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("refusing changes", result.stderr)
+        self.assert_repositories_unchanged(repos)
+        self.assertEqual(cache.read_bytes(), payload_bytes(baseline))
+
+    def test_v3_booted_1_1_cannot_materialize_or_select_1_0(self) -> None:
+        live = v3_payload()
+        result, repos, cache, _, _ = self.run_repoc(
+            "v3-no-downgrade", live, selected="stable", installed_version="1.1.0-DEVELOPMENT"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(cache.read_bytes(), payload_bytes(live))
+        self.assertTrue((repos / "FreeSense-repo-devel.conf").exists())
+        self.assertTrue((repos / "FreeSense-repo-devel.default").exists())
+        self.assertEqual(
+            (repos / "FreeSense-repo-devel.version").read_text(encoding="utf-8").strip(),
+            "1.1.0",
+        )
+        self.assertFalse((repos / "FreeSense-repo-stable.conf").exists())
+
+    def test_v3_booted_1_0_can_select_stable_or_upgrade_to_1_1(self) -> None:
+        live = v3_payload()
+        result, repos, _, _, _ = self.run_repoc(
+            "v3-booted-stable", live, selected="stable", installed_version="1.0.0-RELEASE"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((repos / "FreeSense-repo-stable.default").exists())
+        self.assertTrue((repos / "FreeSense-repo-stable.conf").exists())
+        self.assertTrue((repos / "FreeSense-repo-devel.conf").exists())
+
+    def test_v3_rejects_stable_patch_rollback(self) -> None:
+        baseline = v3_payload()
+        baseline["channels"]["stable"]["version"] = "1.0.1"
+        candidate = v3_payload()
+        result, repos, cache, _, _ = self.run_repoc(
+            "v3-stable-rollback", candidate, cached=baseline, selected="stable"
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("rolled back", result.stderr)
         self.assert_repositories_unchanged(repos)
         self.assertEqual(cache.read_bytes(), payload_bytes(baseline))
 

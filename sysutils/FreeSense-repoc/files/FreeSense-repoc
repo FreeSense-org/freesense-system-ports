@@ -24,6 +24,12 @@ MANIFEST_CACHE="${MANIFEST_CACHE:-/cf/conf/${PRODUCT}-repos.manifest.json}"
 CHANNEL_KEY="${CHANNEL_KEY:-${SHARE_DIR}/keys/channel/public.pem}"
 FETCH_TIMEOUT="${FETCH_TIMEOUT:-15}"
 LOCK_FILE="${LOCK_FILE:-/var/run/${PRODUCT}-repoc.lock}"
+INSTALLED_VERSION_FILE="${INSTALLED_VERSION_FILE:-/etc/version}"
+INSTALLED_VERSION="${INSTALLED_VERSION:-}"
+if [ -z "${INSTALLED_VERSION}" ] && [ -r "${INSTALLED_VERSION_FILE}" ]; then
+	IFS= read -r INSTALLED_VERSION <"${INSTALLED_VERSION_FILE}" || true
+fi
+[ -n "${INSTALLED_VERSION}" ] || INSTALLED_VERSION="0.0.0"
 
 usage() {
 	cat <<EOF
@@ -125,7 +131,7 @@ function validate_component($component, $kind, $train, $schema) {
         $expected = "https://pkg.freesense.org/v1/artifacts/packages/" .
             $train . "/" . $fingerprint . "/amd64";
     }
-    if ($schema === "freesense.channels/v2") {
+    if (in_array($schema, ["freesense.channels/v2", "freesense.channels/v3"], true)) {
         $pin = $component["freebsd_pin_id"] ?? null;
         if (!is_string($pin) || !preg_match("/^[0-9a-f]{64}$/D", $pin)) invalid_payload(17);
         if ($kind === "packages") {
@@ -136,18 +142,30 @@ function validate_component($component, $kind, $train, $schema) {
     if (($component["url"] ?? null) !== $expected) invalid_payload(16);
     return $component;
 }
-function validate_document($filename) {
+function version_parts($value) {
+    if (!is_string($value) || !preg_match("/^([0-9]+)[.]([0-9]+)[.]([0-9]+)$/D", $value, $parts)) {
+        invalid_payload(29);
+    }
+    return [(int)$parts[1], (int)$parts[2], (int)$parts[3]];
+}
+function channel_is_eligible($version, $installed) {
+    [$major, $minor, $patch] = version_parts($version);
+    [$installed_major, $installed_minor, $installed_patch] = version_parts($installed);
+    return [$major, $minor, $patch] >= [$installed_major, $installed_minor, $installed_patch];
+}
+function validate_document($filename, $installed) {
     $raw = @file_get_contents($filename);
     if ($raw === false || $raw === "") invalid_payload(20);
     $doc = json_decode($raw, true);
     $schema = $doc["schema_version"] ?? null;
     if (!is_array($doc) || json_last_error() !== JSON_ERROR_NONE ||
-        !in_array($schema, ["freesense.channels/v1", "freesense.channels/v2"], true) ||
+        !in_array($schema, ["freesense.channels/v1", "freesense.channels/v2", "freesense.channels/v3"], true) ||
         !is_array($doc["channels"] ?? null) || count($doc["channels"]) === 0) {
         invalid_payload(21);
     }
     $rows = [];
     $complete = [];
+    $eligible = [];
     $defaults = 0;
     $default_name = "";
     foreach ($doc["channels"] as $key => $channel) {
@@ -157,6 +175,7 @@ function validate_document($filename) {
             invalid_payload(22);
         }
         $description = $channel["description"] ?? null;
+        $version = $channel["version"] ?? null;
         $train = $channel["package_train"] ?? null;
         $abi = $channel["abi"] ?? null;
         $altabi = $channel["altabi"] ?? null;
@@ -164,6 +183,12 @@ function validate_document($filename) {
         if (!safe_text($description) || !is_string($train) ||
             !preg_match("/^[0-9]+[.][0-9]+$/D", $train) ||
             !is_bool($default)) invalid_payload(23);
+        if ($schema === "freesense.channels/v3") {
+            [$version_major, $version_minor, $_version_patch] = version_parts($version);
+            if ($train !== $version_major . "." . $version_minor) invalid_payload(29);
+        } else {
+            $version = $train . ".0";
+        }
         if (!is_string($abi) || !is_string($altabi) ||
             !preg_match("/^FreeBSD:([0-9]+):amd64$/D", $abi, $abi_parts) ||
             !preg_match("/^freebsd:([0-9]+):x86:64$/D", $altabi, $altabi_parts) ||
@@ -176,7 +201,7 @@ function validate_document($filename) {
             if (!is_string($binding) ||
                 !preg_match("/^[0-9a-f]{64}$/D", $binding) ||
                 $binding !== $system["fingerprint"]) invalid_payload(26);
-            if ($schema === "freesense.channels/v2" &&
+            if (in_array($schema, ["freesense.channels/v2", "freesense.channels/v3"], true) &&
                 $packages["freebsd_pin_id"] !== $system["freebsd_pin_id"]) invalid_payload(28);
         }
         if ($default) {
@@ -185,10 +210,12 @@ function validate_document($filename) {
         }
         $complete[$key] = $system !== null && $packages !== null &&
             $system["verified"] === true && $packages["verified"] === true;
-        if ($complete[$key]) {
+        $eligible[$key] = $schema !== "freesense.channels/v3" || channel_is_eligible($version, $installed);
+        if ($complete[$key] && $eligible[$key]) {
             $rows[] = implode("|", [
                 $key,
                 $description,
+                $version,
                 $system["url"],
                 $packages["url"],
                 $train,
@@ -199,7 +226,7 @@ function validate_document($filename) {
         }
     }
     if ($defaults !== 1) invalid_payload(27);
-    return [$doc, $rows, $complete, $default_name];
+    return [$doc, $rows, $complete, $eligible, $default_name];
 }
 function reject_generation_rollback($new_channel, $old_channel, $new_schema) {
     foreach (["system", "packages"] as $kind) {
@@ -210,7 +237,7 @@ function reject_generation_rollback($new_channel, $old_channel, $new_schema) {
             $new["fingerprint"] !== $old["fingerprint"]) invalid_payload(32);
         $binding_changed = $new_schema === "freesense.channels/v1" &&
             ($new["system_fingerprint"] ?? "") !== ($old["system_fingerprint"] ?? "");
-        $pin_changed = $new_schema === "freesense.channels/v2" && (
+        $pin_changed = in_array($new_schema, ["freesense.channels/v2", "freesense.channels/v3"], true) && (
             ($new["freebsd_pin_id"] ?? "") !== ($old["freebsd_pin_id"] ?? "") ||
             ($new["built_against_system"] ?? "") !== ($old["built_against_system"] ?? "")
         );
@@ -227,11 +254,19 @@ function reject_generation_rollback($new_channel, $old_channel, $new_schema) {
             $new_channel["altabi"] !== $old_channel["altabi"]
     )) invalid_payload(35);
 }
-[$candidate, $rows, $complete, $default_name] = validate_document($argv[1]);
+[$candidate, $rows, $complete, $eligible, $default_name] = validate_document($argv[1], $argv[5]);
 $selected = $argv[4] !== "" ? $argv[4] : $default_name;
-if (!isset($complete[$selected]) || !$complete[$selected]) invalid_payload(50);
+if (($eligible[$selected] ?? true) === false) $selected = $default_name;
+if (!isset($complete[$selected]) || !$complete[$selected] || !($eligible[$selected] ?? false)) invalid_payload(50);
 if ($argv[3] !== "" && file_exists($argv[3])) {
-    [$baseline, $_, $baseline_complete, $_default] = validate_document($argv[3]);
+    [$baseline, $_, $baseline_complete, $_baseline_eligible, $_default] = validate_document($argv[3], $argv[5]);
+    if ($candidate["schema_version"] === "freesense.channels/v3" &&
+        $baseline["schema_version"] === "freesense.channels/v3") {
+        foreach ($candidate["channels"] as $name => $channel) {
+            if (isset($baseline["channels"][$name]) &&
+                version_compare($channel["version"], $baseline["channels"][$name]["version"], "<")) invalid_payload(36);
+        }
+    }
     if (($baseline_complete[$selected] ?? false) === true) {
         reject_generation_rollback(
             $candidate["channels"][$selected],
@@ -242,7 +277,7 @@ if ($argv[3] !== "" && file_exists($argv[3])) {
 }
 $encoded = implode("\n", $rows) . "\n";
 if (@file_put_contents($argv[2], $encoded) !== strlen($encoded)) invalid_payload(40);
-' "${1}" "${2}" "${3:-}" "${4:-}"
+' "${1}" "${2}" "${3:-}" "${4:-}" "${INSTALLED_VERSION}"
 }
 
 persist_payload() {
@@ -354,7 +389,7 @@ STAGED_REPOS="$(mktemp -d "${repos_parent}/.${repos_name}.new.XXXXXX")"
 
 COUNT=0
 DEFAULT_NAME=""
-while IFS='|' read -r name description system_url packages_url train abi altabi default; do
+while IFS='|' read -r name description version system_url packages_url train abi altabi default; do
 	[ -n "${name}" ] || continue
 	base="${STAGED_REPOS}/${PRODUCT}-repo-${name}"
 	cat >"${base}.conf" <<EOF
@@ -381,6 +416,7 @@ ${PRODUCT}-packages: {
 EOF
 	printf '%s' "${name}" >"${base}.name"
 	printf '%s\n' "${description}" >"${base}.descr"
+	printf '%s\n' "${version}" >"${base}.version"
 	printf '%s\n' "${abi}" >"${base}.abi"
 	printf '%s\n' "${altabi}" >"${base}.altabi"
 	if [ "${default}" = yes ]; then
