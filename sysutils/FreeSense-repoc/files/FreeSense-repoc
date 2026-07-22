@@ -53,9 +53,9 @@ if [ -z "${NOFETCH}" ] && [ "${FREESENSE_REPOC_LOCKED:-}" != 1 ]; then
 	FREESENSE_REPOC_LOCKED=1
 	export FREESENSE_REPOC_LOCKED
 	if command -v lockf >/dev/null 2>&1; then
-		exec lockf "${LOCK_FILE}" "$0" "$@"
+		exec lockf "${LOCK_FILE}" /bin/sh "$0" "$@"
 	elif command -v flock >/dev/null 2>&1; then
-		exec flock "${LOCK_FILE}" "$0" "$@"
+		exec flock "${LOCK_FILE}" /bin/sh "$0" "$@"
 	else
 		echo "FreeSense-repoc: lockf or flock is required" >&2
 		exit 1
