@@ -107,7 +107,7 @@ function safe_text($value) {
     return is_string($value) && $value !== "" &&
         !preg_match("/[|\\r\\n\\x00]/", $value);
 }
-function validate_component($component, $kind, $train) {
+function validate_component($component, $kind, $train, $schema) {
     if ($component === null) return null;
     if (!is_array($component)) invalid_payload(10);
     $fingerprint = $component["fingerprint"] ?? null;
@@ -125,6 +125,14 @@ function validate_component($component, $kind, $train) {
         $expected = "https://pkg.freesense.org/v1/artifacts/packages/" .
             $train . "/" . $fingerprint . "/amd64";
     }
+    if ($schema === "freesense.channels/v2") {
+        $pin = $component["freebsd_pin_id"] ?? null;
+        if (!is_string($pin) || !preg_match("/^[0-9a-f]{64}$/D", $pin)) invalid_payload(17);
+        if ($kind === "packages") {
+            $built = $component["built_against_system"] ?? null;
+            if (!is_string($built) || !preg_match("/^[0-9a-f]{64}$/D", $built)) invalid_payload(18);
+        }
+    }
     if (($component["url"] ?? null) !== $expected) invalid_payload(16);
     return $component;
 }
@@ -132,8 +140,9 @@ function validate_document($filename) {
     $raw = @file_get_contents($filename);
     if ($raw === false || $raw === "") invalid_payload(20);
     $doc = json_decode($raw, true);
+    $schema = $doc["schema_version"] ?? null;
     if (!is_array($doc) || json_last_error() !== JSON_ERROR_NONE ||
-        ($doc["schema_version"] ?? null) !== "freesense.channels/v1" ||
+        !in_array($schema, ["freesense.channels/v1", "freesense.channels/v2"], true) ||
         !is_array($doc["channels"] ?? null) || count($doc["channels"]) === 0) {
         invalid_payload(21);
     }
@@ -159,14 +168,16 @@ function validate_document($filename) {
             !preg_match("/^FreeBSD:([0-9]+):amd64$/D", $abi, $abi_parts) ||
             !preg_match("/^freebsd:([0-9]+):x86:64$/D", $altabi, $altabi_parts) ||
             $abi_parts[1] !== $altabi_parts[1]) invalid_payload(24);
-        $system = validate_component($channel["system"] ?? null, "system", $train);
-        $packages = validate_component($channel["packages"] ?? null, "packages", $train);
+        $system = validate_component($channel["system"] ?? null, "system", $train, $schema);
+        $packages = validate_component($channel["packages"] ?? null, "packages", $train, $schema);
         if ($packages !== null && $system === null) invalid_payload(25);
         if ($packages !== null) {
             $binding = $packages["system_fingerprint"] ?? null;
             if (!is_string($binding) ||
                 !preg_match("/^[0-9a-f]{64}$/D", $binding) ||
                 $binding !== $system["fingerprint"]) invalid_payload(26);
+            if ($schema === "freesense.channels/v2" &&
+                $packages["freebsd_pin_id"] !== $system["freebsd_pin_id"]) invalid_payload(28);
         }
         if ($default) {
             $defaults++;
@@ -190,18 +201,23 @@ function validate_document($filename) {
     if ($defaults !== 1) invalid_payload(27);
     return [$doc, $rows, $complete, $default_name];
 }
-function reject_generation_rollback($new_channel, $old_channel) {
+function reject_generation_rollback($new_channel, $old_channel, $new_schema) {
     foreach (["system", "packages"] as $kind) {
         $old = $old_channel[$kind];
         $new = $new_channel[$kind];
         if ($new["generation"] < $old["generation"]) invalid_payload(31);
         if ($new["generation"] === $old["generation"] &&
             $new["fingerprint"] !== $old["fingerprint"]) invalid_payload(32);
+        $binding_changed = $new_schema === "freesense.channels/v1" &&
+            ($new["system_fingerprint"] ?? "") !== ($old["system_fingerprint"] ?? "");
+        $pin_changed = $new_schema === "freesense.channels/v2" && (
+            ($new["freebsd_pin_id"] ?? "") !== ($old["freebsd_pin_id"] ?? "") ||
+            ($new["built_against_system"] ?? "") !== ($old["built_against_system"] ?? "")
+        );
         if ($new["fingerprint"] === $old["fingerprint"] && (
             $new["generation"] !== $old["generation"] ||
             $new["url"] !== $old["url"] ||
-            ($new["system_fingerprint"] ?? "") !==
-                ($old["system_fingerprint"] ?? "")
+            $binding_changed || $pin_changed
         )) invalid_payload(34);
     }
     if ($new_channel["system"]["fingerprint"] ===
@@ -219,7 +235,8 @@ if ($argv[3] !== "" && file_exists($argv[3])) {
     if (($baseline_complete[$selected] ?? false) === true) {
         reject_generation_rollback(
             $candidate["channels"][$selected],
-            $baseline["channels"][$selected]
+            $baseline["channels"][$selected],
+            $candidate["schema_version"]
         );
     }
 }
