@@ -34,3 +34,5 @@ jobs:
           find . -type f \( -name '*.php' -o -name '*.inc' \) -print0 | xargs -0 -r -n1 php -l
           find . -type f \( -name 'pkg-install.in' -o -name 'pkg-deinstall.in' \) -print0 | xargs -0 -r -n1 sh -n
           sh -n sysutils/FreeSense-repoc/files/FreeSense-repoc
+      - name: Repository updater safety
+        run: python3 -m unittest -v tests/test_repoc.py
