@@ -22,6 +22,7 @@ SYSTEM_SHA = "a" * 64
 PACKAGES_SHA = "b" * 64
 STABLE_SYSTEM_SHA = "c" * 64
 STABLE_PACKAGES_SHA = "d" * 64
+FREEBSD_PIN = "9" * 64
 
 
 def component_url(kind: str, fingerprint: str, train: str = "1.1") -> str:
@@ -89,6 +90,18 @@ def valid_payload(
             )
         },
     }
+
+
+def v2_payload(**kwargs: object) -> dict[str, object]:
+    payload = valid_payload(**kwargs)
+    payload["schema_version"] = "freesense.channels/v2"
+    for channel in payload["channels"].values():
+        system = channel["system"]
+        packages = channel["packages"]
+        system["freebsd_pin_id"] = FREEBSD_PIN
+        packages["freebsd_pin_id"] = FREEBSD_PIN
+        packages["built_against_system"] = system["fingerprint"]
+    return payload
 
 
 def stable_complete_devel_pending_payload() -> dict[str, object]:
@@ -609,6 +622,38 @@ exec "$REAL_MV" "$@"
                 self.assertIn("rolled back", result.stderr)
                 self.assert_repositories_unchanged(repos)
                 self.assertEqual(cache.read_bytes(), baseline_raw)
+
+    def test_v2_reuses_optional_packages_across_system_updates_on_same_pin(self) -> None:
+        baseline = v2_payload()
+        live = v2_payload(
+            system_sha=STABLE_SYSTEM_SHA,
+            packages_sha=PACKAGES_SHA,
+            system_generation=13,
+            packages_generation=8,
+        )
+        packages = live["channels"]["devel"]["packages"]
+        packages["built_against_system"] = SYSTEM_SHA
+        result, repos, cache, _, _ = self.run_repoc(
+            "v2-same-pin-package-reuse", live, cached=baseline
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(cache.read_bytes(), payload_bytes(live))
+        config = (repos / "FreeSense-repo-devel.conf").read_text(encoding="utf-8")
+        self.assertIn(component_url("system", STABLE_SYSTEM_SHA), config)
+        self.assertIn(component_url("packages", PACKAGES_SHA), config)
+
+    def test_v2_rejects_reused_optional_packages_if_pin_changes(self) -> None:
+        baseline = v2_payload()
+        live = copy.deepcopy(baseline)
+        live["channels"]["devel"]["system"]["freebsd_pin_id"] = "8" * 64
+        live["channels"]["devel"]["packages"]["freebsd_pin_id"] = "8" * 64
+        result, repos, cache, _, _ = self.run_repoc(
+            "v2-changed-pin-package-reuse", live, cached=baseline
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("refusing changes", result.stderr)
+        self.assert_repositories_unchanged(repos)
+        self.assertEqual(cache.read_bytes(), payload_bytes(baseline))
 
     def test_invalid_retained_payload_is_not_used_after_fetch_failure(self) -> None:
         retained = valid_payload()
