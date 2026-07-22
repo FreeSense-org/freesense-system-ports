@@ -339,7 +339,9 @@ exec "$REAL_MV" "$@"
                 "FAKE_CURL_FAIL": "1" if fetch_failure else "0",
                 "FAKE_MV_FAIL_NEW": "1" if fail_swap else "0",
                 "REAL_MV": self.real_mv,
-                "INSTALLED_VERSION": installed_version.split("-", 1)[0],
+                # Exercise the exact value read from /etc/version. repoc must
+                # normalize lifecycle suffixes itself before version checks.
+                "INSTALLED_VERSION": installed_version,
             }
         )
         command = [self.shell, REPOC]
