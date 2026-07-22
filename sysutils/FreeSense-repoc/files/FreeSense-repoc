@@ -1,7 +1,7 @@
 #!/bin/sh
 # Materialize FreeSense pkg repositories from one signed channel document.
 
-set -u
+set -eu
 
 PHP="${PHP:-/usr/local/bin/php}"
 OPENSSL="${OPENSSL:-/usr/bin/openssl}"
@@ -18,17 +18,18 @@ read_global() {
 PRODUCT="${PRODUCT:-$(read_global product_name FreeSense)}"
 REPOS_DIR="${REPOS_DIR:-$(read_global pkg_repos_path "/usr/local/etc/${PRODUCT}/pkg/repos")}"
 SHARE_DIR="${SHARE_DIR:-/usr/local/share/${PRODUCT}}"
-ARCH="${ARCH:-$(uname -p)}"
 MANIFEST_URL="${MANIFEST_URL:-https://pkg.freesense.org/v1/repos.manifest.json}"
 MANIFEST_LOCAL="${MANIFEST_LOCAL:-${SHARE_DIR}/repos.manifest.json}"
+MANIFEST_CACHE="${MANIFEST_CACHE:-/cf/conf/${PRODUCT}-repos.manifest.json}"
 CHANNEL_KEY="${CHANNEL_KEY:-${SHARE_DIR}/keys/channel/public.pem}"
 FETCH_TIMEOUT="${FETCH_TIMEOUT:-15}"
+LOCK_FILE="${LOCK_FILE:-/var/run/${PRODUCT}-repoc.lock}"
 
 usage() {
 	cat <<EOF
 Usage: $(basename "$0") [-N] [-l] [-f] [-h]
   -N   synchronize repository files (default)
-  -l   use only the trusted manifest baked into the image
+  -l   use only the read-only channel payload baked into the image
   -f   print supported feature flags
   -h   show this help
 EOF
@@ -46,11 +47,231 @@ while getopts "Nlfh" option 2>/dev/null; do
 done
 
 [ -x "${PHP}" ] || { echo "FreeSense-repoc: PHP is required" >&2; exit 1; }
-WORK="$(mktemp -d -t freesense-repoc 2>/dev/null || echo "/tmp/freesense-repoc.$$")"
-mkdir -p "${WORK}"
-trap 'rm -rf "${WORK}"' EXIT HUP INT TERM
+if [ -z "${NOFETCH}" ] && [ "${FREESENSE_REPOC_LOCKED:-}" != 1 ]; then
+	lock_dir="$(dirname "${LOCK_FILE}")"
+	mkdir -p "${lock_dir}"
+	FREESENSE_REPOC_LOCKED=1
+	export FREESENSE_REPOC_LOCKED
+	if command -v lockf >/dev/null 2>&1; then
+		exec lockf "${LOCK_FILE}" /bin/sh "$0" "$@"
+	elif command -v flock >/dev/null 2>&1; then
+		exec flock "${LOCK_FILE}" /bin/sh "$0" "$@"
+	else
+		echo "FreeSense-repoc: lockf or flock is required" >&2
+		exit 1
+	fi
+fi
 
-PAYLOAD=""
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/freesense-repoc.XXXXXX")"
+STAGED_REPOS=""
+BACKUP_REPOS=""
+cleanup() {
+	status=$?
+	trap - EXIT HUP INT TERM
+	if [ -n "${BACKUP_REPOS}" ] && [ -e "${BACKUP_REPOS}" ]; then
+		if [ ! -e "${REPOS_DIR}" ]; then
+			if mv "${BACKUP_REPOS}" "${REPOS_DIR}"; then
+				BACKUP_REPOS=""
+			else
+				echo "FreeSense-repoc: repository recovery failed; backup remains at ${BACKUP_REPOS}" >&2
+				status=1
+			fi
+		else
+			rm -rf "${BACKUP_REPOS}"
+			BACKUP_REPOS=""
+		fi
+	fi
+	if [ -n "${STAGED_REPOS}" ] && [ -e "${STAGED_REPOS}" ]; then
+		rm -rf "${STAGED_REPOS}"
+	fi
+	rm -rf "${WORK}"
+	exit "${status}"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+
+SELECTED=""
+for marker in "${REPOS_DIR}/${PRODUCT}-repo-"*.default; do
+	[ -e "${marker}" ] || continue
+	SELECTED="${marker##*/${PRODUCT}-repo-}"
+	SELECTED="${SELECTED%.default}"
+	break
+done
+
+validate_payload() {
+	"${PHP}" -n -r '
+function invalid_payload($code) {
+    exit($code);
+}
+function safe_text($value) {
+    return is_string($value) && $value !== "" &&
+        !preg_match("/[|\\r\\n\\x00]/", $value);
+}
+function validate_component($component, $kind, $train) {
+    if ($component === null) return null;
+    if (!is_array($component)) invalid_payload(10);
+    $fingerprint = $component["fingerprint"] ?? null;
+    if (!is_string($fingerprint) ||
+        !preg_match("/^[0-9a-f]{64}$/D", $fingerprint)) invalid_payload(11);
+    if (!is_bool($component["verified"] ?? null)) invalid_payload(12);
+    $generation = $component["generation"] ?? null;
+    if (!is_int($generation) || $generation <= 0) invalid_payload(13);
+    $expected = "https://pkg.freesense.org/v1/artifacts/system/" .
+        $fingerprint . "/amd64";
+    if ($kind === "system") {
+        if (array_key_exists("system_fingerprint", $component) &&
+            $component["system_fingerprint"] !== "") invalid_payload(15);
+    } else {
+        $expected = "https://pkg.freesense.org/v1/artifacts/packages/" .
+            $train . "/" . $fingerprint . "/amd64";
+    }
+    if (($component["url"] ?? null) !== $expected) invalid_payload(16);
+    return $component;
+}
+function validate_document($filename) {
+    $raw = @file_get_contents($filename);
+    if ($raw === false || $raw === "") invalid_payload(20);
+    $doc = json_decode($raw, true);
+    if (!is_array($doc) || json_last_error() !== JSON_ERROR_NONE ||
+        ($doc["schema_version"] ?? null) !== "freesense.channels/v1" ||
+        !is_array($doc["channels"] ?? null) || count($doc["channels"]) === 0) {
+        invalid_payload(21);
+    }
+    $rows = [];
+    $complete = [];
+    $defaults = 0;
+    $default_name = "";
+    foreach ($doc["channels"] as $key => $channel) {
+        if (!is_string($key) ||
+            !preg_match("/^[a-z0-9][a-z0-9.-]*$/D", $key) ||
+            !is_array($channel) || ($channel["name"] ?? null) !== $key) {
+            invalid_payload(22);
+        }
+        $description = $channel["description"] ?? null;
+        $train = $channel["package_train"] ?? null;
+        $abi = $channel["abi"] ?? null;
+        $altabi = $channel["altabi"] ?? null;
+        $default = $channel["default"] ?? null;
+        if (!safe_text($description) || !is_string($train) ||
+            !preg_match("/^[0-9]+[.][0-9]+$/D", $train) ||
+            !is_bool($default)) invalid_payload(23);
+        if (!is_string($abi) || !is_string($altabi) ||
+            !preg_match("/^FreeBSD:([0-9]+):amd64$/D", $abi, $abi_parts) ||
+            !preg_match("/^freebsd:([0-9]+):x86:64$/D", $altabi, $altabi_parts) ||
+            $abi_parts[1] !== $altabi_parts[1]) invalid_payload(24);
+        $system = validate_component($channel["system"] ?? null, "system", $train);
+        $packages = validate_component($channel["packages"] ?? null, "packages", $train);
+        if ($packages !== null && $system === null) invalid_payload(25);
+        if ($packages !== null) {
+            $binding = $packages["system_fingerprint"] ?? null;
+            if (!is_string($binding) ||
+                !preg_match("/^[0-9a-f]{64}$/D", $binding) ||
+                $binding !== $system["fingerprint"]) invalid_payload(26);
+        }
+        if ($default) {
+            $defaults++;
+            $default_name = $key;
+        }
+        $complete[$key] = $system !== null && $packages !== null &&
+            $system["verified"] === true && $packages["verified"] === true;
+        if ($complete[$key]) {
+            $rows[] = implode("|", [
+                $key,
+                $description,
+                $system["url"],
+                $packages["url"],
+                $train,
+                $abi,
+                $altabi,
+                $default ? "yes" : "no",
+            ]);
+        }
+    }
+    if ($defaults !== 1) invalid_payload(27);
+    return [$doc, $rows, $complete, $default_name];
+}
+function reject_generation_rollback($new_channel, $old_channel) {
+    foreach (["system", "packages"] as $kind) {
+        $old = $old_channel[$kind];
+        $new = $new_channel[$kind];
+        if ($new["generation"] < $old["generation"]) invalid_payload(31);
+        if ($new["generation"] === $old["generation"] &&
+            $new["fingerprint"] !== $old["fingerprint"]) invalid_payload(32);
+        if ($new["fingerprint"] === $old["fingerprint"] && (
+            $new["generation"] !== $old["generation"] ||
+            $new["url"] !== $old["url"] ||
+            ($new["system_fingerprint"] ?? "") !==
+                ($old["system_fingerprint"] ?? "")
+        )) invalid_payload(34);
+    }
+    if ($new_channel["system"]["fingerprint"] ===
+        $old_channel["system"]["fingerprint"] && (
+            $new_channel["package_train"] !== $old_channel["package_train"] ||
+            $new_channel["abi"] !== $old_channel["abi"] ||
+            $new_channel["altabi"] !== $old_channel["altabi"]
+    )) invalid_payload(35);
+}
+[$candidate, $rows, $complete, $default_name] = validate_document($argv[1]);
+$selected = $argv[4] !== "" ? $argv[4] : $default_name;
+if (!isset($complete[$selected]) || !$complete[$selected]) invalid_payload(50);
+if ($argv[3] !== "" && file_exists($argv[3])) {
+    [$baseline, $_, $baseline_complete, $_default] = validate_document($argv[3]);
+    if (($baseline_complete[$selected] ?? false) === true) {
+        reject_generation_rollback(
+            $candidate["channels"][$selected],
+            $baseline["channels"][$selected]
+        );
+    }
+}
+$encoded = implode("\n", $rows) . "\n";
+if (@file_put_contents($argv[2], $encoded) !== strlen($encoded)) invalid_payload(40);
+' "${1}" "${2}" "${3:-}" "${4:-}"
+}
+
+persist_payload() {
+	manifest_dir="$(dirname "${MANIFEST_CACHE}")"
+	manifest_name="${MANIFEST_CACHE##*/}"
+	mkdir -p "${manifest_dir}" || return 1
+	manifest_tmp="$(umask 077; mktemp "${manifest_dir}/.${manifest_name}.tmp.XXXXXX")" || return 1
+	if cp "${1}" "${manifest_tmp}" &&
+	    chmod 0644 "${manifest_tmp}" &&
+	    mv -f "${manifest_tmp}" "${MANIFEST_CACHE}"; then
+		return 0
+	fi
+	rm -f "${manifest_tmp}" 2>/dev/null || true
+	return 1
+}
+
+load_fallback() {
+	if [ -e "${MANIFEST_CACHE}" ]; then
+		if validate_payload "${MANIFEST_CACHE}" "${WORK}/rows" "" "${SELECTED}"; then
+			return 0
+		else
+			fallback_status=$?
+		fi
+		if [ "${fallback_status}" -ne 50 ]; then
+			echo "FreeSense-repoc: retained channel payload is invalid; refusing changes" >&2
+			return 2
+		fi
+		echo "FreeSense-repoc: selected retained channel is still pending; trying baked channel" >&2
+	fi
+	if [ -r "${MANIFEST_LOCAL}" ]; then
+		if validate_payload "${MANIFEST_LOCAL}" "${WORK}/rows" "" "${SELECTED}"; then
+			return 0
+		else
+			fallback_status=$?
+		fi
+		if [ "${fallback_status}" -eq 50 ]; then
+			echo "FreeSense-repoc: selected baked channel is still pending" >&2
+		else
+			echo "FreeSense-repoc: baked channel payload is invalid; refusing changes" >&2
+		fi
+		return 2
+	fi
+	return 1
+}
+
+LIVE_PAYLOAD=""
 if [ -z "${NOFETCH}" ] && command -v curl >/dev/null 2>&1 && [ -r "${CHANNEL_KEY}" ]; then
 	if curl -fsS --proto '=https' --max-time "${FETCH_TIMEOUT}" \
 	    -o "${WORK}/envelope.json" "${MANIFEST_URL}" 2>/dev/null &&
@@ -60,66 +281,65 @@ if (!is_array($doc) || ($doc["schema_version"] ?? "") !== "freesense.repositorie
 $payload = base64_decode($doc["payload"] ?? "", true);
 $signature = base64_decode($doc["signature"] ?? "", true);
 if ($payload === false || $signature === false || $payload === "" || $signature === "") exit(3);
-file_put_contents($argv[2], $payload);
-file_put_contents($argv[3], $signature);
+if (@file_put_contents($argv[2], $payload) !== strlen($payload)) exit(4);
+if (@file_put_contents($argv[3], $signature) !== strlen($signature)) exit(5);
 ' "${WORK}/envelope.json" "${WORK}/payload.json" "${WORK}/signature.bin" &&
 	    "${OPENSSL}" dgst -sha256 -verify "${CHANNEL_KEY}" \
 	      -signature "${WORK}/signature.bin" "${WORK}/payload.json" >/dev/null 2>&1; then
-		PAYLOAD="${WORK}/payload.json"
+		LIVE_PAYLOAD="${WORK}/payload.json"
 	else
-		echo "FreeSense-repoc: live channel document was unavailable or invalid; using baked channel" >&2
+		echo "FreeSense-repoc: live channel transport, envelope, or signature failed; trying trusted fallback" >&2
 	fi
 fi
 
-if [ -z "${PAYLOAD}" ] && [ -r "${MANIFEST_LOCAL}" ]; then
-	PAYLOAD="${MANIFEST_LOCAL}"
+if [ -n "${NOFETCH}" ]; then
+	[ -r "${MANIFEST_LOCAL}" ] || {
+		echo "FreeSense-repoc: no readable baked channel payload is available" >&2
+		exit 1
+	}
+	validate_payload "${MANIFEST_LOCAL}" "${WORK}/rows" "" "${SELECTED}" || {
+		echo "FreeSense-repoc: baked channel payload is pending or invalid; refusing changes" >&2
+		exit 1
+	}
+elif [ -n "${LIVE_PAYLOAD}" ]; then
+	if validate_payload "${LIVE_PAYLOAD}" "${WORK}/rows" "${MANIFEST_CACHE}" "${SELECTED}"; then
+		persist_payload "${LIVE_PAYLOAD}" || {
+			echo "FreeSense-repoc: could not atomically retain the validated live channel" >&2
+			exit 1
+		}
+	else
+		live_status=$?
+		if [ "${live_status}" -ne 50 ]; then
+			echo "FreeSense-repoc: signed live channel is invalid or rolled back; refusing changes" >&2
+			exit 1
+		fi
+		echo "FreeSense-repoc: selected live channel is still pending; using trusted fallback" >&2
+		if load_fallback; then
+			:
+		else
+			echo "FreeSense-repoc: no complete trusted fallback channel is available" >&2
+			exit 1
+		fi
+	fi
+else
+	if load_fallback; then
+		:
+	else
+		echo "FreeSense-repoc: no complete trusted fallback channel is available" >&2
+		exit 1
+	fi
 fi
-[ -n "${PAYLOAD}" ] || { echo "FreeSense-repoc: no trusted channel document is available" >&2; exit 1; }
 
-"${PHP}" -n -r '
-$doc = json_decode(file_get_contents($argv[1]), true);
-if (!is_array($doc) || ($doc["schema_version"] ?? "") !== "freesense.channels/v1" || !is_array($doc["channels"] ?? null)) exit(2);
-foreach ($doc["channels"] as $key => $channel) {
-    if (!is_array($channel)) exit(3);
-    $name = (string)($channel["name"] ?? $key);
-    $description = (string)($channel["description"] ?? $name);
-    $train = (string)($channel["package_train"] ?? "");
-    $abi = (string)($channel["abi"] ?? "");
-    $altabi = (string)($channel["altabi"] ?? "");
-    $system = is_array($channel["system"] ?? null) ? (string)($channel["system"]["url"] ?? "") : "";
-    $packages = is_array($channel["packages"] ?? null) ? (string)($channel["packages"]["url"] ?? "") : "";
-    if (!preg_match("/^[a-z0-9][a-z0-9.-]*$/", $name) || $train === "" || $abi === "" || $altabi === "") exit(4);
-    if ($system === "" || !preg_match("#^https://pkg[.]freesense[.]org/v1/artifacts/system/[0-9a-f]{64}/amd64$#", $system)) exit(5);
-    if ($packages !== "" && !preg_match("#^https://pkg[.]freesense[.]org/v1/artifacts/packages/[0-9]+[.][0-9]+/[0-9a-f]{64}/amd64$#", $packages)) exit(6);
-    $fields = [$name, $description, $system, $packages, $train, $abi, $altabi, !empty($channel["default"]) ? "yes" : "no"];
-    foreach ($fields as &$value) $value = str_replace(["|", "\r", "\n"], "", (string)$value);
-    echo implode("|", $fields), "\n";
-}
-' "${PAYLOAD}" >"${WORK}/rows" || {
-	echo "FreeSense-repoc: trusted channel payload is invalid" >&2
-	exit 1
-}
-
-SELECTED=""
-for marker in "${REPOS_DIR}/${PRODUCT}-repo-"*.default; do
-	[ -e "${marker}" ] || continue
-	SELECTED="${marker##*/${PRODUCT}-repo-}"
-	SELECTED="${SELECTED%.default}"
-	break
-done
-mkdir -p "${REPOS_DIR}"
-rm -f "${REPOS_DIR}/${PRODUCT}-repo-"*.conf \
-	"${REPOS_DIR}/${PRODUCT}-repo-"*.name \
-	"${REPOS_DIR}/${PRODUCT}-repo-"*.descr \
-	"${REPOS_DIR}/${PRODUCT}-repo-"*.abi \
-	"${REPOS_DIR}/${PRODUCT}-repo-"*.altabi \
-	"${REPOS_DIR}/${PRODUCT}-repo-"*.default 2>/dev/null || true
+repos_parent="$(dirname "${REPOS_DIR}")"
+repos_name="${REPOS_DIR##*/}"
+mkdir -p "${repos_parent}"
+STAGED_REPOS="$(mktemp -d "${repos_parent}/.${repos_name}.new.XXXXXX")"
 
 COUNT=0
 DEFAULT_NAME=""
 while IFS='|' read -r name description system_url packages_url train abi altabi default; do
 	[ -n "${name}" ] || continue
-	base="${REPOS_DIR}/${PRODUCT}-repo-${name}"
+	base="${STAGED_REPOS}/${PRODUCT}-repo-${name}"
 	cat >"${base}.conf" <<EOF
 FreeBSD: { enabled: no }
 FreeBSD-kmods: { enabled: no }
@@ -132,9 +352,6 @@ ${PRODUCT}: {
   priority: 100,
   enabled: yes
 }
-EOF
-	if [ -n "${packages_url}" ]; then
-		cat >>"${base}.conf" <<EOF
 
 ${PRODUCT}-packages: {
   url: "${packages_url}",
@@ -145,18 +362,43 @@ ${PRODUCT}-packages: {
   enabled: yes
 }
 EOF
-	fi
 	printf '%s' "${name}" >"${base}.name"
 	printf '%s\n' "${description}" >"${base}.descr"
 	printf '%s\n' "${abi}" >"${base}.abi"
 	printf '%s\n' "${altabi}" >"${base}.altabi"
-	[ "${default}" = yes ] && DEFAULT_NAME="${name}"
+	if [ "${default}" = yes ]; then
+		DEFAULT_NAME="${name}"
+	fi
 	COUNT=$((COUNT + 1))
 done <"${WORK}/rows"
 
 [ "${COUNT}" -gt 0 ] || { echo "FreeSense-repoc: channel document has no usable repositories" >&2; exit 1; }
-if [ -n "${SELECTED}" ] && [ -f "${REPOS_DIR}/${PRODUCT}-repo-${SELECTED}.conf" ]; then
-	: >"${REPOS_DIR}/${PRODUCT}-repo-${SELECTED}.default"
+if [ -n "${SELECTED}" ] && [ -f "${STAGED_REPOS}/${PRODUCT}-repo-${SELECTED}.conf" ]; then
+	: >"${STAGED_REPOS}/${PRODUCT}-repo-${SELECTED}.default"
 elif [ -n "${DEFAULT_NAME}" ]; then
-	: >"${REPOS_DIR}/${PRODUCT}-repo-${DEFAULT_NAME}.default"
+	: >"${STAGED_REPOS}/${PRODUCT}-repo-${DEFAULT_NAME}.default"
+fi
+
+if [ -e "${REPOS_DIR}" ]; then
+	BACKUP_REPOS="$(mktemp -d "${repos_parent}/.${repos_name}.old.XXXXXX")"
+	rmdir "${BACKUP_REPOS}"
+	mv "${REPOS_DIR}" "${BACKUP_REPOS}"
+fi
+if mv "${STAGED_REPOS}" "${REPOS_DIR}"; then
+	STAGED_REPOS=""
+else
+	swap_status=$?
+	if [ -n "${BACKUP_REPOS}" ] && [ -e "${BACKUP_REPOS}" ]; then
+		if mv "${BACKUP_REPOS}" "${REPOS_DIR}"; then
+			BACKUP_REPOS=""
+		else
+			echo "FreeSense-repoc: repository swap and recovery both failed; backup remains at ${BACKUP_REPOS}" >&2
+		fi
+	fi
+	echo "FreeSense-repoc: repository swap failed; previous state was retained" >&2
+	exit "${swap_status}"
+fi
+if [ -n "${BACKUP_REPOS}" ] && [ -e "${BACKUP_REPOS}" ]; then
+	rm -rf "${BACKUP_REPOS}"
+	BACKUP_REPOS=""
 fi
