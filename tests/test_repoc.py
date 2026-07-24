@@ -23,6 +23,7 @@ PACKAGES_SHA = "b" * 64
 STABLE_SYSTEM_SHA = "c" * 64
 STABLE_PACKAGES_SHA = "d" * 64
 FREEBSD_PIN = "9" * 64
+OSVERSION = 1600019
 
 
 def component_url(kind: str, fingerprint: str, train: str = "1.1") -> str:
@@ -115,9 +116,11 @@ def v3_payload() -> dict[str, object]:
     )
     stable["version"] = "1.0.0"
     stable["system"]["freebsd_pin_id"] = FREEBSD_PIN
+    stable["system"]["osversion"] = OSVERSION
     stable["packages"]["freebsd_pin_id"] = FREEBSD_PIN
     stable["packages"]["built_against_system"] = STABLE_SYSTEM_SHA
     payload["channels"]["stable"] = stable
+    payload["channels"]["devel"]["system"]["osversion"] = OSVERSION
     return payload
 
 
@@ -700,6 +703,37 @@ exec "$REAL_MV" "$@"
         self.assertTrue((repos / "FreeSense-repo-stable.default").exists())
         self.assertTrue((repos / "FreeSense-repo-stable.conf").exists())
         self.assertTrue((repos / "FreeSense-repo-devel.conf").exists())
+        self.assertEqual(
+            (repos / "FreeSense-repo-stable.osversion").read_text(
+                encoding="utf-8"
+            ).strip(),
+            str(OSVERSION),
+        )
+        self.assertEqual(
+            (repos / "FreeSense-repo-devel.osversion").read_text(
+                encoding="utf-8"
+            ).strip(),
+            str(OSVERSION),
+        )
+
+    def test_v3_rejects_invalid_exact_osversion(self) -> None:
+        for name, value in (
+            ("string", str(OSVERSION)),
+            ("previous-major", 1599999),
+            ("next-major", 1700000),
+        ):
+            with self.subTest(name=name):
+                live = v3_payload()
+                live["channels"]["stable"]["system"]["osversion"] = value
+                result, repos, _, _, _ = self.run_repoc(
+                    f"v3-osversion-{name}",
+                    live,
+                    selected="stable",
+                    installed_version="1.0.0-RELEASE",
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("refusing changes", result.stderr)
+                self.assert_repositories_unchanged(repos)
 
     def test_v3_rejects_stable_patch_rollback(self) -> None:
         baseline = v3_payload()
