@@ -25,6 +25,24 @@ class OptionalPackageInstallTests(unittest.TestCase):
         self.assertNotIn('pkg_lock "${product}"', install)
         self.assertNotIn("unlock_optional_system_pkg", UPGRADE)
 
+    def test_system_upgrade_does_not_orphan_optional_packages(self) -> None:
+        orphan_loop = (
+            "for _package in $(_pkg query %n "
+            "$(_pkg info -E -g ${pkg_prefix}\\*)); do"
+        )
+
+        self.assertNotIn(orphan_loop, UPGRADE)
+        self.assertNotIn(
+            '"Scheduling package ${_package} for removal"',
+            UPGRADE,
+        )
+        self.assertEqual(
+            UPGRADE.count(
+                "A System-only repository query must never classify them as orphans."
+            ),
+            2,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

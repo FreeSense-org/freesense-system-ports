@@ -2,7 +2,7 @@ PORTNAME=	FreeSense-upgrade
 PORTVERSION=	1.3.25
 # FreeSense: bumped to force a rebuild after patching files/. PORTVERSION is
 # fixed, so every shipped script correction must advance PORTREVISION.
-PORTREVISION=	6
+PORTREVISION=	7
 CATEGORIES=	sysutils
 MASTER_SITES=	# empty
 DISTFILES=	# empty
