@@ -35,4 +35,4 @@ jobs:
           find . -type f \( -name 'pkg-install.in' -o -name 'pkg-deinstall.in' \) -print0 | xargs -0 -r -n1 sh -n
           sh -n sysutils/FreeSense-repoc/files/FreeSense-repoc
       - name: Repository updater safety
-        run: python3 -m unittest -v tests/test_repoc.py
+        run: python3 -m unittest -v tests/test_repoc.py tests/test_upgrade_guard.py
