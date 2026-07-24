@@ -199,6 +199,12 @@ function validate_document($filename, $installed) {
             $abi_parts[1] !== $altabi_parts[1]) invalid_payload(24);
         $system = validate_component($channel["system"] ?? null, "system", $train, $schema);
         $packages = validate_component($channel["packages"] ?? null, "packages", $train, $schema);
+        $osversion = $system["osversion"] ?? null;
+        if ($osversion !== null && (
+            !is_int($osversion) ||
+            $osversion < ((int)$abi_parts[1] * 100000) ||
+            $osversion >= (((int)$abi_parts[1] + 1) * 100000)
+        )) invalid_payload(30);
         if ($packages !== null && $system === null) invalid_payload(25);
         if ($packages !== null) {
             $binding = $packages["system_fingerprint"] ?? null;
@@ -225,6 +231,7 @@ function validate_document($filename, $installed) {
                 $train,
                 $abi,
                 $altabi,
+                $osversion === null ? "" : (string)$osversion,
                 $default ? "yes" : "no",
             ]);
         }
@@ -255,7 +262,9 @@ function reject_generation_rollback($new_channel, $old_channel, $new_schema) {
         $old_channel["system"]["fingerprint"] && (
             $new_channel["package_train"] !== $old_channel["package_train"] ||
             $new_channel["abi"] !== $old_channel["abi"] ||
-            $new_channel["altabi"] !== $old_channel["altabi"]
+            $new_channel["altabi"] !== $old_channel["altabi"] ||
+            ($new_channel["system"]["osversion"] ?? null) !==
+                ($old_channel["system"]["osversion"] ?? null)
     )) invalid_payload(35);
 }
 [$candidate, $rows, $complete, $eligible, $default_name] = validate_document($argv[1], $argv[5]);
@@ -393,7 +402,7 @@ STAGED_REPOS="$(mktemp -d "${repos_parent}/.${repos_name}.new.XXXXXX")"
 
 COUNT=0
 DEFAULT_NAME=""
-while IFS='|' read -r name description version system_url packages_url train abi altabi default; do
+while IFS='|' read -r name description version system_url packages_url train abi altabi osversion default; do
 	[ -n "${name}" ] || continue
 	base="${STAGED_REPOS}/${PRODUCT}-repo-${name}"
 	cat >"${base}.conf" <<EOF
@@ -423,6 +432,9 @@ EOF
 	printf '%s\n' "${version}" >"${base}.version"
 	printf '%s\n' "${abi}" >"${base}.abi"
 	printf '%s\n' "${altabi}" >"${base}.altabi"
+	if [ -n "${osversion}" ]; then
+		printf '%s\n' "${osversion}" >"${base}.osversion"
+	fi
 	if [ "${default}" = yes ]; then
 		DEFAULT_NAME="${name}"
 	fi

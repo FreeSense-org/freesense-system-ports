@@ -10,6 +10,13 @@ UPGRADE = (
     / "files"
     / "FreeSense-upgrade"
 ).read_text(encoding="utf-8")
+REPO_SETUP = (
+    ROOT
+    / "sysutils"
+    / "FreeSense-upgrade"
+    / "files"
+    / "FreeSense-repo-setup"
+).read_text(encoding="utf-8")
 
 
 class OptionalPackageInstallTests(unittest.TestCase):
@@ -42,6 +49,22 @@ class OptionalPackageInstallTests(unittest.TestCase):
             ),
             2,
         )
+
+
+class RepositoryOSVersionTests(unittest.TestCase):
+    def test_running_userland_is_the_legacy_fallback(self) -> None:
+        self.assertIn('OSVERSION="$(uname -U 2>/dev/null || true)"', REPO_SETUP)
+        self.assertIn(
+            'OSVERSION="$(echo "${ABI}" | cut -f2 -d:)00000"',
+            REPO_SETUP,
+        )
+
+    def test_signed_repository_osversion_overrides_the_fallback(self) -> None:
+        self.assertIn(
+            '[ -r "${_repo_conf_file%%.conf}.osversion" ]',
+            REPO_SETUP,
+        )
+        self.assertIn('OSVERSION="${_repo_osversion}"', REPO_SETUP)
 
 
 if __name__ == "__main__":

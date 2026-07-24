@@ -148,8 +148,8 @@ validate_repo_conf() {
 }
 
 abi_setup() {
-	local _arch _cur_abi _cur_altabi _freebsd_version _new_pkg _pkg_ver _repo_conf_file
-	unset _arch _cur_abi _cur_altabi _freebsd_version _new_pkg _pkg_ver _repo_conf_file
+	local _arch _cur_abi _cur_altabi _freebsd_version _new_pkg _pkg_ver _repo_conf_file _repo_osversion
+	unset _arch _cur_abi _cur_altabi _freebsd_version _new_pkg _pkg_ver _repo_conf_file _repo_osversion
 
 	_arch="$(uname -p)"
 	_freebsd_version="$(uname -r)"
@@ -188,11 +188,29 @@ abi_setup() {
 		ALTABI="${_cur_altabi}"
 	fi
 
-	OSVERSION="$(echo "${ABI}" | cut -f2 -d:)00000"
+	# pkg needs the exact __FreeBSD_version, not only the ABI major. Prefer the
+	# running userland as the safe fallback for legacy channel documents, then
+	# allow the signed repository client to select an exact target version.
+	OSVERSION="$(uname -U 2>/dev/null || true)"
+	case "${OSVERSION}" in
+	""|*[!0-9]*)
+		OSVERSION="$(echo "${ABI}" | cut -f2 -d:)00000"
+		;;
+	esac
 	OSVERSION_FEAT="$(get_repoc_feat | /usr/bin/grep -c "osversion")"
-	[ "${?}" -eq 0 ] && [ "${OSVERSION_FEAT}" = "1" ] && \
-	    [ -r "${_repo_conf_file%%.conf}.osversion" ] && \
-	    OSVERSION="$(/bin/cat "${_repo_conf_file%%.conf}.osversion")"
+	if [ "${?}" -eq 0 ] && [ "${OSVERSION_FEAT}" = "1" ] && \
+	    [ -r "${_repo_conf_file%%.conf}.osversion" ]; then
+		_repo_osversion="$(/bin/cat "${_repo_conf_file%%.conf}.osversion")"
+		case "${_repo_osversion}" in
+		""|*[!0-9]*)
+			echo "Invalid repository OSVERSION" >&2
+			return 1
+			;;
+		*)
+			OSVERSION="${_repo_osversion}"
+			;;
+		esac
+	fi
 
 	/bin/rm -f "${PKG_CONF}" 2> /dev/null
 	/usr/bin/touch "${PKG_CONF}" 2> /dev/null
