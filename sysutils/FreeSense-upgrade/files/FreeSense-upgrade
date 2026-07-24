@@ -154,6 +154,9 @@ _exit() {
 	if [ -n "${unlock_additional_pkgs}" ]; then
 		pkg_unlock "${pkg_prefix}*"
 	fi
+	if [ -n "${unlock_optional_system_pkg}" ]; then
+		pkg_unlock "${unlock_optional_system_pkg}"
+	fi
 
 	if [ -n "${BE_UPGRADE_FAILED}" ]; then
 		be_unmount -f "${UPGRADE_BE}"
@@ -2126,6 +2129,7 @@ compare_pkg_version() {
 
 pkg_install() {
 	local _pkg_name="${1}"
+	local _system_lock_state=""
 
 	local _force=""
 	if [ -n "${2}" ]; then
@@ -2157,8 +2161,29 @@ pkg_install() {
 		local _msg="Installing"
 	fi
 
+	# Optional packages must never replace or remove any part of the running
+	# System closure.  Locking the main package protects its dependency chain,
+	# so pkg aborts a conflicting transaction instead of removing nginx, PHP,
+	# or another WebGUI dependency.  Release the temporary lock on both the
+	# success path below and the shared failure path in _exit().
+	case "${_pkg_name}" in
+	"${pkg_prefix}"*)
+		if is_pkg_installed "${product}"; then
+			_system_lock_state=$(_pkg query %k "${product}")
+			if [ "${_system_lock_state}" = "0" ]; then
+				unlock_optional_system_pkg="${product}"
+				pkg_lock "${product}"
+			fi
+		fi
+		;;
+	esac
+
 	pkg_with_pb "${_cmd}${dry_run:+ }${dry_run} ${_pkg_name}" \
 	    "${_msg} ${_pkg_name}"
+	if [ -n "${unlock_optional_system_pkg}" ]; then
+		pkg_unlock "${unlock_optional_system_pkg}"
+		unset unlock_optional_system_pkg
+	fi
 	_exec "pkg-static clean" "Cleaning up cache" mute ignore_result
 }
 
