@@ -1116,13 +1116,8 @@ be_pkg_upgrade()
 	be_unset_prop "${UPGRADE_BE}" freesense:upgrading
 	be_set_prop "${UPGRADE_BE}" freesense:version "$(be_get_base_version "${UPGRADE_BE}")"
 
-	# Remove packages removed from remote repo
-	if is_pkg_installed ${pkg_prefix}\*; then
-		for _package in $(_pkg query %n $(_pkg info -E -g ${pkg_prefix}\*)); do
-			_pkg rquery -U -r ${product} %v ${_package} >/dev/null && continue
-			_exec "_pkg set -A 1 ${_package}" "Scheduling package ${_package} for removal"
-		done
-	fi
+	# Optional Packages have an independent signed repository and lifecycle.
+	# A System-only repository query must never classify them as orphans.
 
 	# Cleanup caches and unnecessary packages before unmounting
 	_exec "_pkg autoremove" "Removing unnecessary packages" mute ignore_result
@@ -1576,13 +1571,8 @@ pkg_upgrade() {
 			fi
 		fi
 
-		# Remove packages removed from remote repo
-		if is_pkg_installed ${pkg_prefix}\*; then
-			for _package in $(_pkg query %n $(_pkg info -E -g ${pkg_prefix}\*)); do
-				_pkg rquery -U -r ${product} %v ${_package} >/dev/null && continue
-				_exec "_pkg set -A 1 ${_package}" "Scheduling package ${_package} for removal"
-			done
-		fi
+		# Optional Packages have an independent signed repository and lifecycle.
+		# A System-only repository query must never classify them as orphans.
 
 		# Cleanup caches and unnecessary packages before unmounting
 		_exec "_pkg autoremove" "Removing unnecessary packages" mute ignore_result
