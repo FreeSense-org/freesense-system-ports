@@ -52,6 +52,17 @@ class OptionalPackageInstallTests(unittest.TestCase):
 
 
 class RepositoryOSVersionTests(unittest.TestCase):
+    def test_changed_repository_tools_have_hotfix_revisions(self) -> None:
+        upgrade_makefile = (
+            ROOT / "sysutils" / "FreeSense-upgrade" / "Makefile"
+        ).read_text(encoding="utf-8")
+        repoc_makefile = (
+            ROOT / "sysutils" / "FreeSense-repoc" / "Makefile"
+        ).read_text(encoding="utf-8")
+
+        self.assertRegex(upgrade_makefile, r"(?m)^PORTREVISION=\s*8$")
+        self.assertRegex(repoc_makefile, r"(?m)^PORTREVISION=\s*5$")
+
     def test_running_userland_is_the_legacy_fallback(self) -> None:
         self.assertIn('OSVERSION="$(uname -U 2>/dev/null || true)"', REPO_SETUP)
         self.assertIn(
