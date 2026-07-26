@@ -8,6 +8,7 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE = ROOT / "sysutils/FreeSense-cloud-init/files/freesense_cloud_init.py"
+PORT_MAKEFILE = ROOT / "sysutils/FreeSense-cloud-init/Makefile"
 FIXTURES = ROOT / "tests/fixtures/cloud-init"
 SPEC = importlib.util.spec_from_file_location("freesense_cloud_init", MODULE)
 CLOUD = importlib.util.module_from_spec(SPEC)
@@ -23,6 +24,12 @@ BASE_XML = """<?xml version="1.0"?>
 
 
 class CloudInitAdapterTests(unittest.TestCase):
+    def test_port_keeps_guest_agent_as_an_independent_image_package(self):
+        makefile = PORT_MAKEFILE.read_text(encoding="utf-8")
+        self.assertIn("RUN_DEPENDS=\tcloud-init:net/cloud-init", makefile)
+        self.assertNotIn("qemu-guest-agent", makefile)
+        self.assertNotIn("qemu@guestagent", makefile)
+
     def run_apply(self, fixture, detected):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
