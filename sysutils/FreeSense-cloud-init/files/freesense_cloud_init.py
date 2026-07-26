@@ -365,11 +365,21 @@ def configure_interface(node: ET.Element, item: dict) -> None:
         set_text(node, "mtu", item["mtu"])
 
 
+def configured_instance_id(config_path: Path) -> str | None:
+    """Return the instance applied to the current boot environment."""
+    try:
+        return ET.parse(config_path).getroot().findtext("cloudinit/instance_id")
+    except (ET.ParseError, OSError):
+        return None
+
+
 def apply(metadata: dict, detected: list[dict], config_path: Path, state_path: Path) -> bool:
     instance_id = metadata.get("instance_id")
     if not isinstance(instance_id, str) or not instance_id.strip():
         raise InvalidMetadata("instance_id is required")
-    if state_path.exists() and load_json(state_path).get("instance_id") == instance_id:
+    if (state_path.exists()
+            and load_json(state_path).get("instance_id") == instance_id
+            and configured_instance_id(config_path) == instance_id):
         return False
     keys = valid_keys(metadata.get("ssh_authorized_keys"))
     network = normalize_network(metadata.get("network"))

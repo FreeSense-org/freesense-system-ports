@@ -138,6 +138,24 @@ class CloudInitAdapterTests(unittest.TestCase):
         self.assertEqual(str(interfaces[1]["addresses"][0]), "10.30.0.1/24")
         self.assertEqual(interfaces[1]["dns"], ["9.9.9.9"])
 
+    def test_boot_environment_rollback_reapplies_shared_instance(self):
+        changed, config, state, _, metadata = self.run_apply(
+            "configdrive-one-nic.json",
+            [{"name": "vtnet0", "mac": "02:00:00:00:00:01"}],
+        )
+        self.assertTrue(changed)
+        config.write_text(BASE_XML, encoding="utf-8")
+        self.assertTrue(CLOUD.apply(
+            metadata,
+            [{"name": "vtnet0", "mac": "02:00:00:00:00:01"}],
+            config,
+            state,
+        ))
+        self.assertEqual(
+            ET.parse(config).getroot().findtext("cloudinit/instance_id"),
+            metadata["instance_id"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
