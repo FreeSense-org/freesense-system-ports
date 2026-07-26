@@ -1,0 +1,33 @@
+{
+  "schema_version": "freesense.cloud-metadata/v1",
+  "instance_id": "nocloud-i-100",
+  "hostname": "edge-1.example.test",
+  "timezone": "Europe/Copenhagen",
+  "ssh_authorized_keys": [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICBnQ0Cpsm3s4XD6Pt26+URfM2kB5an6zP2ri6PRyPdm admin@test"
+  ],
+  "network": {
+    "version": 2,
+    "ethernets": {
+      "uplink": {
+        "match": {"macaddress": "02:00:00:00:00:01"},
+        "dhcp4": true,
+        "dhcp6": true,
+        "routes": [{"to": "0.0.0.0/0", "via": "192.0.2.1"}],
+        "mtu": 1500
+      },
+      "inside": {
+        "match": {"macaddress": "02:00:00:00:00:02"},
+        "addresses": ["10.20.0.1/24", "2001:db8:20::1/64"],
+        "nameservers": {"addresses": ["1.1.1.1", "2606:4700:4700::1111"]}
+      }
+    }
+  },
+  "freesense": {
+    "interfaces": [
+      {"match": "02:00:00:00:00:01", "role": "wan"},
+      {"match": "02:00:00:00:00:02", "role": "lan"}
+    ],
+    "management_cidrs": ["198.51.100.0/24"]
+  }
+}
