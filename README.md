@@ -14,5 +14,10 @@ Changes here may trigger a new versioned system repository, but never an
 optional-package repository rebuild. The product version and package train are
 derived from `src/etc/version` in the FreeSense source repository.
 
+`sysutils/FreeSense-cloud-init` is part of the System build closure so its
+dependencies come from the pinned FreeBSD ports tree. It is installed only by
+the cloud-image assembly stage; installer ISOs and ordinary appliances do not
+include or execute the adapter.
+
 Do not add ports named `FreeSense-pkg-*` or the optional-package catalog
 framework to this repository. The boundary check in CI enforces that rule.

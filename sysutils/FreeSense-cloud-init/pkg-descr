@@ -1,0 +1,4 @@
+Imports cloud-init identity, SSH keys, and network metadata into FreeSense's
+native config.xml.  The adapter keeps cloud-init from maintaining a competing
+rc.conf network configuration and provides atomic, instance-ID-based
+provisioning for NoCloud, ConfigDrive, and OpenStack guests.

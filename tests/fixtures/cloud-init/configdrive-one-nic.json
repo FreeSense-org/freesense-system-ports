@@ -1,0 +1,19 @@
+{
+  "schema_version": "freesense.cloud-metadata/v1",
+  "instance_id": "configdrive-i-200",
+  "hostname": "single.example.test",
+  "ssh_authorized_keys": [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICBnQ0Cpsm3s4XD6Pt26+URfM2kB5an6zP2ri6PRyPdm admin@test"
+  ],
+  "network": {
+    "interfaces": [
+      {
+        "name": "vtnet0",
+        "mac": "02:00:00:00:00:01",
+        "dhcp4": true,
+        "default_route": true
+      }
+    ]
+  },
+  "freesense": {"management_cidrs": ["203.0.113.10/32"]}
+}
