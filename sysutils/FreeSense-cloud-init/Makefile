@@ -10,8 +10,7 @@ COMMENT=	Cloud-init adapter for native FreeSense configuration
 
 LICENSE=	APACHE20
 
-RUN_DEPENDS=	cloud-init:net/cloud-init \
-		qemu-ga:emulators/qemu-guest-agent
+RUN_DEPENDS=	cloud-init:net/cloud-init
 
 USES=		python:3.11+
 NO_ARCH=	yes
