@@ -93,6 +93,11 @@ def query_cloud_init() -> dict:
     return value
 
 
+def initialize_cloud_init_local() -> None:
+    """Discover local datasources before FreeSense configures networking."""
+    subprocess.run(["cloud-init", "init", "--local"], check=True)
+
+
 def normalize(raw: dict) -> dict:
     """Accept a stable adapter document or cloud-init query --all output."""
     if raw.get("schema_version") == "freesense.cloud-metadata/v1":
@@ -558,15 +563,21 @@ def main() -> int:
     parser.add_argument("--state", type=Path, default=DEFAULT_STATE)
     args = parser.parse_args()
     if args.phase == "final":
-        for mode in ("config", "final"):
+        for command in (
+            ("cloud-init", "init"),
+            ("cloud-init", "modules", "--mode", "config"),
+            ("cloud-init", "modules", "--mode", "final"),
+        ):
             completed = subprocess.run(
-                ["cloud-init", "modules", "--mode", mode], check=False
+                command, check=False
             )
             if completed.returncode != 0:
                 return completed.returncode
         subprocess.run(["service", "qemu_guest_agent", "onestart"], check=False)
         return 0
     try:
+        if not args.input:
+            initialize_cloud_init_local()
         raw = load_json(args.input) if args.input else query_cloud_init()
         apply(normalize(raw), detected_interfaces(args.interfaces), args.config, args.state)
     except (InvalidMetadata, ET.ParseError, OSError, subprocess.SubprocessError, json.JSONDecodeError) as error:

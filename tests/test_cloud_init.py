@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 import xml.etree.ElementTree as ET
 
 
@@ -29,6 +30,11 @@ class CloudInitAdapterTests(unittest.TestCase):
         self.assertIn("RUN_DEPENDS=\tcloud-init:net/cloud-init", makefile)
         self.assertNotIn("qemu-guest-agent", makefile)
         self.assertNotIn("qemu@guestagent", makefile)
+
+    def test_local_datasource_is_initialized_before_query(self):
+        with mock.patch.object(CLOUD.subprocess, "run") as run:
+            CLOUD.initialize_cloud_init_local()
+        run.assert_called_once_with(["cloud-init", "init", "--local"], check=True)
 
     def run_apply(self, fixture, detected):
         directory = tempfile.TemporaryDirectory()
