@@ -1,5 +1,6 @@
 PORTNAME=	FreeSense-cloud-init
 PORTVERSION=	1.0.0
+PORTREVISION=	1
 CATEGORIES=	sysutils
 MASTER_SITES=	# empty
 DISTFILES=	# empty
