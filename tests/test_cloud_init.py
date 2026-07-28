@@ -37,7 +37,7 @@ class CloudInitAdapterTests(unittest.TestCase):
     def test_wrapper_uses_ports_selected_python(self):
         makefile = PORT_MAKEFILE.read_text(encoding="utf-8")
         wrapper = WRAPPER_TEMPLATE.read_text(encoding="utf-8")
-        self.assertIn("PORTREVISION=\t3", makefile)
+        self.assertIn("PORTREVISION=\t4", makefile)
         self.assertIn("SUB_FILES=\tfreesense-cloud-init", makefile)
         self.assertIn("SUB_LIST=\tPYTHON_CMD=${PYTHON_CMD}", makefile)
         self.assertIn("${WRKDIR}/freesense-cloud-init", makefile)
@@ -48,6 +48,14 @@ class CloudInitAdapterTests(unittest.TestCase):
         )
         self.assertIn("exec /usr/local/bin/python3.12", rendered)
         self.assertNotRegex(rendered, r"%%[A-Z0-9_]+%%")
+
+    def test_final_phase_uses_the_installed_guest_agent_service_name(self):
+        module = MODULE.read_text(encoding="utf-8")
+        self.assertIn(
+            'subprocess.run(["service", "qemu-guest-agent", "onestart"], check=False)',
+            module,
+        )
+        self.assertNotIn('["service", "qemu_guest_agent", "onestart"]', module)
 
     def test_local_datasource_is_initialized_before_query(self):
         with mock.patch.object(CLOUD.subprocess, "run") as run:
