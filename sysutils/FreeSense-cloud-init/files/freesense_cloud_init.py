@@ -573,7 +573,7 @@ def main() -> int:
             )
             if completed.returncode != 0:
                 return completed.returncode
-        subprocess.run(["service", "qemu_guest_agent", "onestart"], check=False)
+        subprocess.run(["service", "qemu-guest-agent", "onestart"], check=False)
         return 0
     try:
         if not args.input:
