@@ -10,6 +10,9 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[1]
 MODULE = ROOT / "sysutils/FreeSense-cloud-init/files/freesense_cloud_init.py"
 PORT_MAKEFILE = ROOT / "sysutils/FreeSense-cloud-init/Makefile"
+WRAPPER_TEMPLATE = (
+    ROOT / "sysutils/FreeSense-cloud-init/files/freesense-cloud-init.in"
+)
 FIXTURES = ROOT / "tests/fixtures/cloud-init"
 SPEC = importlib.util.spec_from_file_location("freesense_cloud_init", MODULE)
 CLOUD = importlib.util.module_from_spec(SPEC)
@@ -30,6 +33,15 @@ class CloudInitAdapterTests(unittest.TestCase):
         self.assertIn("RUN_DEPENDS=\tcloud-init:net/cloud-init", makefile)
         self.assertNotIn("qemu-guest-agent", makefile)
         self.assertNotIn("qemu@guestagent", makefile)
+
+    def test_wrapper_uses_ports_selected_python(self):
+        makefile = PORT_MAKEFILE.read_text(encoding="utf-8")
+        wrapper = WRAPPER_TEMPLATE.read_text(encoding="utf-8")
+        self.assertIn("PORTREVISION=\t2", makefile)
+        self.assertIn("SUB_FILES=\tfreesense-cloud-init", makefile)
+        self.assertIn("${WRKDIR}/freesense-cloud-init", makefile)
+        self.assertIn("exec %%PYTHON_CMD%%", wrapper)
+        self.assertNotIn("python3.11", wrapper)
 
     def test_local_datasource_is_initialized_before_query(self):
         with mock.patch.object(CLOUD.subprocess, "run") as run:

@@ -1,6 +1,6 @@
 PORTNAME=	FreeSense-cloud-init
 PORTVERSION=	1.0.0
-PORTREVISION=	1
+PORTREVISION=	2
 CATEGORIES=	sysutils
 MASTER_SITES=	# empty
 DISTFILES=	# empty
@@ -14,6 +14,7 @@ LICENSE=	APACHE20
 RUN_DEPENDS=	cloud-init:net/cloud-init
 
 USES=		python:3.11+
+SUB_FILES=	freesense-cloud-init
 NO_ARCH=	yes
 NO_BUILD=	yes
 NO_MTREE=	yes
@@ -30,7 +31,7 @@ do-install:
 	${MKDIR} ${STAGEDIR}${PREFIX}/sbin \
 		${STAGEDIR}${PREFIX}/etc/cloud/cloud.cfg.d \
 		${STAGEDIR}${PREFIX}/share/freesense/cloud-init
-	${INSTALL_SCRIPT} ${WRKSRC}/freesense-cloud-init \
+	${INSTALL_SCRIPT} ${WRKDIR}/freesense-cloud-init \
 		${STAGEDIR}${PREFIX}/sbin/freesense-cloud-init
 	${INSTALL_DATA} ${WRKSRC}/freesense_cloud_init.py \
 		${STAGEDIR}${PREFIX}/share/freesense/cloud-init/freesense_cloud_init.py
