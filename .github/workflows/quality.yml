@@ -34,5 +34,8 @@ jobs:
           find . -type f \( -name '*.php' -o -name '*.inc' \) -print0 | xargs -0 -r -n1 php -l
           find . -type f \( -name 'pkg-install.in' -o -name 'pkg-deinstall.in' \) -print0 | xargs -0 -r -n1 sh -n
           sh -n sysutils/FreeSense-repoc/files/FreeSense-repoc
+          sh -n sysutils/FreeSense-cloud-init/files/freesense-cloud-init.in
       - name: Repository updater safety
-        run: python3 -m unittest -v tests/test_repoc.py tests/test_upgrade_guard.py
+        run: >-
+          python3 -m unittest -v
+          tests/test_repoc.py tests/test_upgrade_guard.py tests/test_cloud_init.py
