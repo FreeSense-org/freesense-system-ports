@@ -1,6 +1,6 @@
 PORTNAME=	FreeSense-cloud-init
 PORTVERSION=	1.0.0
-PORTREVISION=	2
+PORTREVISION=	3
 CATEGORIES=	sysutils
 MASTER_SITES=	# empty
 DISTFILES=	# empty
@@ -15,6 +15,7 @@ RUN_DEPENDS=	cloud-init:net/cloud-init
 
 USES=		python:3.11+
 SUB_FILES=	freesense-cloud-init
+SUB_LIST=	PYTHON_CMD=${PYTHON_CMD}
 NO_ARCH=	yes
 NO_BUILD=	yes
 NO_MTREE=	yes
