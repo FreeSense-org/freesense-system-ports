@@ -110,7 +110,9 @@ def normalize(raw: dict) -> dict:
         or ds.get("network_config")
         or {}
     )
-    keys = raw.get("public_ssh_keys") or meta.get("public_keys") or []
+    keys = raw.get("ssh_authorized_keys")
+    if keys is None:
+        keys = raw.get("public_ssh_keys") or meta.get("public_keys") or []
     if isinstance(keys, dict):
         keys = list(keys.values())
     return {
