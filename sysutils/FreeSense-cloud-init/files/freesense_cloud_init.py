@@ -26,6 +26,9 @@ DEFAULT_STATE = Path("/var/db/freesense-cloud-init/instance.json")
 DEFAULT_USER_DATA = Path("/var/lib/cloud/instance/user-data.txt")
 DEFAULT_NETWORK_CONFIG_JSON = Path("/var/lib/cloud/instance/network-config.json")
 DEFAULT_NETWORK_CONFIG = Path("/var/lib/cloud/instance/network-config")
+REDACTED_USERDATA = frozenset({"redacted", "none", "null"})
+CLOUD_CONFIG_KEYS = ("hostname", "fqdn", "timezone", "ssh_authorized_keys", "freesense")
+SSH_AUTHORIZED_KEYS_MARK = re.compile(r"(?m)^\s*ssh_authorized_keys\s*:")
 
 
 class InvalidMetadata(ValueError):
@@ -48,6 +51,65 @@ def load_json(path: Path) -> dict:
     return value
 
 
+def usable_user_data_text(value: object) -> str | None:
+    """Return non-empty raw user-data text, treating redacted placeholders as missing."""
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    lowered = text.lower()
+    if lowered in REDACTED_USERDATA or lowered.startswith("ci-b64-"):
+        return None
+    return value
+
+
+def load_raw_user_data(query_all: dict) -> str | None:
+    """Load raw cloud-config text from official query, query --all, then on-disk cache."""
+    candidates: list[object] = []
+    try:
+        queried = subprocess.run(
+            ["cloud-init", "query", "userdata"],
+            check=False, text=True, capture_output=True,
+        )
+        if queried.returncode == 0:
+            candidates.append(queried.stdout)
+    except OSError:
+        pass
+    candidates.append(query_all.get("userdata"))
+    if DEFAULT_USER_DATA.is_file():
+        try:
+            candidates.append(DEFAULT_USER_DATA.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError) as error:
+            raise InvalidMetadata(f"user-data is unreadable: {error}") from error
+    for candidate in candidates:
+        text = usable_user_data_text(candidate)
+        if text is not None:
+            return text
+    return None
+
+
+def merge_cloud_config(value: dict, user_data: str | None) -> dict:
+    """Merge selected cloud-config keys from raw user-data into a query document."""
+    if user_data is None:
+        return value
+    try:
+        import yaml
+    except ImportError as error:
+        raise InvalidMetadata("cloud-init YAML support is unavailable") from error
+    try:
+        configured = yaml.safe_load(user_data)
+    except yaml.YAMLError as error:
+        raise InvalidMetadata(f"cloud-config is unreadable: {error}") from error
+    if not isinstance(configured, dict):
+        raise InvalidMetadata("cloud-config user-data must be an object")
+    for key in CLOUD_CONFIG_KEYS:
+        if key in configured:
+            value[key] = configured[key]
+    value["_freesense_raw_user_data"] = user_data
+    return value
+
+
 def query_cloud_init() -> dict:
     fixture = os.environ.get("FREESENSE_CLOUD_INIT_INPUT")
     if fixture:
@@ -63,24 +125,7 @@ def query_cloud_init() -> dict:
         import yaml
     except ImportError as error:
         raise InvalidMetadata("cloud-init YAML support is unavailable") from error
-    user_data = value.get("userdata")
-    if user_data is None and DEFAULT_USER_DATA.is_file():
-        try:
-            user_data = DEFAULT_USER_DATA.read_text(encoding="utf-8")
-        except (OSError, UnicodeError) as error:
-            raise InvalidMetadata(f"cloud-config is unreadable: {error}") from error
-    if user_data not in (None, ""):
-        if not isinstance(user_data, str):
-            raise InvalidMetadata("cloud-config user-data must be UTF-8 text")
-        try:
-            configured = yaml.safe_load(user_data)
-        except yaml.YAMLError as error:
-            raise InvalidMetadata(f"cloud-config is unreadable: {error}") from error
-        if not isinstance(configured, dict):
-            raise InvalidMetadata("cloud-config user-data must be an object")
-        for key in ("hostname", "fqdn", "timezone", "ssh_authorized_keys", "freesense"):
-            if key in configured:
-                value[key] = configured[key]
+    value = merge_cloud_config(value, load_raw_user_data(value))
     for network_config in (
         DEFAULT_NETWORK_CONFIG_JSON,
         DEFAULT_NETWORK_CONFIG,
@@ -121,7 +166,7 @@ def normalize(raw: dict) -> dict:
         keys = raw.get("public_ssh_keys") or meta.get("public_keys") or []
     if isinstance(keys, dict):
         keys = list(keys.values())
-    return {
+    normalized = {
         "schema_version": "freesense.cloud-metadata/v1",
         "instance_id": raw.get("instance_id") or meta.get("instance-id") or meta.get("uuid"),
         "hostname": raw.get("fqdn") or raw.get("hostname") or meta.get("hostname"),
@@ -130,6 +175,10 @@ def normalize(raw: dict) -> dict:
         "network": network,
         "freesense": raw.get("freesense", {}),
     }
+    raw_user_data = raw.get("_freesense_raw_user_data")
+    if isinstance(raw_user_data, str) and raw_user_data.strip():
+        normalized["_freesense_raw_user_data"] = raw_user_data
+    return normalized
 
 
 def valid_keys(values: object) -> list[str]:
@@ -386,15 +435,54 @@ def configured_instance_id(config_path: Path) -> str | None:
         return None
 
 
+def should_skip_apply(
+    state_path: Path,
+    config_path: Path,
+    instance_id: str,
+    keys: list[str],
+    cidrs: list[str],
+) -> bool:
+    """Skip only when this instance was already applied with at least these keys/CIDRs."""
+    if not state_path.exists():
+        return False
+    try:
+        previous = load_json(state_path)
+    except (InvalidMetadata, json.JSONDecodeError, OSError):
+        return False
+    if previous.get("instance_id") != instance_id:
+        return False
+    if configured_instance_id(config_path) != instance_id:
+        return False
+    previous_keys = previous.get("ssh_key_count", 0)
+    try:
+        previous_keys = int(previous_keys)
+    except (TypeError, ValueError):
+        previous_keys = 0
+    # Re-apply when user-data later exposes keys after a zero-key seal.
+    if keys and previous_keys == 0:
+        return False
+    previous_cidrs = previous.get("management_cidrs", [])
+    if not isinstance(previous_cidrs, list):
+        previous_cidrs = []
+    if cidrs and not previous_cidrs and keys:
+        return False
+    return True
+
+
 def apply(metadata: dict, detected: list[dict], config_path: Path, state_path: Path) -> bool:
     instance_id = metadata.get("instance_id")
     if not isinstance(instance_id, str) or not instance_id.strip():
         raise InvalidMetadata("instance_id is required")
-    if (state_path.exists()
-            and load_json(state_path).get("instance_id") == instance_id
-            and configured_instance_id(config_path) == instance_id):
-        return False
     keys = valid_keys(metadata.get("ssh_authorized_keys"))
+    raw_user_data = metadata.get("_freesense_raw_user_data")
+    if (
+        isinstance(raw_user_data, str)
+        and SSH_AUTHORIZED_KEYS_MARK.search(raw_user_data)
+        and not keys
+    ):
+        raise InvalidMetadata(
+            "cloud-config declares ssh_authorized_keys but none were imported"
+        )
     network = normalize_network(metadata.get("network"))
     extension = metadata.get("freesense", {})
     if extension is None:
@@ -408,6 +496,8 @@ def apply(metadata: dict, detected: list[dict], config_path: Path, state_path: P
         cidrs = [str(ipaddress.ip_network(value, strict=False)) for value in cidrs]
     except (TypeError, ValueError):
         raise InvalidMetadata("invalid management CIDR") from None
+    if should_skip_apply(state_path, config_path, instance_id, keys, cidrs):
+        return False
     assignments = resolve_interfaces(network, detected, extension)
     if len(assignments) == 1:
         role, item = assignments[0]
@@ -536,7 +626,19 @@ def apply(metadata: dict, detected: list[dict], config_path: Path, state_path: P
     else:
         authorized_keys_path.unlink(missing_ok=True)
     state_temp = state_path.with_suffix(".tmp")
-    state_temp.write_text(json.dumps({"instance_id": instance_id}, sort_keys=True) + "\n", encoding="utf-8")
+    state_temp.write_text(
+        json.dumps(
+            {
+                "instance_id": instance_id,
+                "ssh_key_count": len(keys),
+                "management_cidrs": cidrs,
+                "schema": 2,
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     os.replace(state_temp, state_path)
     return True
 

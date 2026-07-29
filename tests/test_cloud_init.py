@@ -37,7 +37,7 @@ class CloudInitAdapterTests(unittest.TestCase):
     def test_wrapper_uses_ports_selected_python(self):
         makefile = PORT_MAKEFILE.read_text(encoding="utf-8")
         wrapper = WRAPPER_TEMPLATE.read_text(encoding="utf-8")
-        self.assertIn("PORTREVISION=\t6", makefile)
+        self.assertIn("PORTREVISION=\t7", makefile)
         self.assertIn("SUB_FILES=\tfreesense-cloud-init", makefile)
         self.assertIn("SUB_LIST=\tPYTHON_CMD=${PYTHON_CMD}", makefile)
         self.assertIn("${WRKDIR}/freesense-cloud-init", makefile)
@@ -75,24 +75,43 @@ class CloudInitAdapterTests(unittest.TestCase):
         })
         self.assertEqual(normalized["ssh_authorized_keys"], [key])
 
-    def test_query_uses_raw_userdata_instead_of_generated_cloud_config(self):
-        key = (
+    def _cloud_config_key(self):
+        return (
             "ssh-ed25519 "
             "AAAAC3NzaC1lZDI1NTE5AAAAICBnQ0Cpsm3s4XD6Pt26+URfM2kB5an6zP2ri6PRyPdm "
             "admin@test"
         )
+
+    def _cloud_config_text(self, key=None):
+        key = key or self._cloud_config_key()
+        return (
+            "#cloud-config\n"
+            f"ssh_authorized_keys:\n  - {key}\n"
+            "freesense:\n"
+            "  management_cidrs:\n"
+            "    - 10.0.2.2/32\n"
+        )
+
+    def _query_subprocess(self, all_payload, userdata_stdout="", userdata_code=0):
+        def runner(cmd, **kwargs):
+            if list(cmd[:3]) == ["cloud-init", "query", "userdata"]:
+                return mock.Mock(returncode=userdata_code, stdout=userdata_stdout)
+            if list(cmd[:3]) == ["cloud-init", "query", "--all"]:
+                return mock.Mock(
+                    returncode=0,
+                    stdout=json.dumps(all_payload),
+                )
+            raise AssertionError(f"unexpected command: {cmd}")
+
+        return runner
+
+    def test_query_uses_raw_userdata_instead_of_generated_cloud_config(self):
+        key = self._cloud_config_key()
         queried = {
             "instance_id": "cloud-query-i-2",
             "public_ssh_keys": [],
-            "userdata": (
-                "#cloud-config\n"
-                f"ssh_authorized_keys:\n  - {key}\n"
-                "freesense:\n"
-                "  management_cidrs:\n"
-                "    - 10.0.2.2/32\n"
-            ),
+            "userdata": self._cloud_config_text(key),
         }
-        completed = mock.Mock(stdout=json.dumps(queried))
         with tempfile.TemporaryDirectory() as directory:
             missing = Path(directory)
             with (
@@ -105,13 +124,21 @@ class CloudInitAdapterTests(unittest.TestCase):
                     missing / "network-config",
                 ),
                 mock.patch.object(
-                    CLOUD.subprocess, "run", return_value=completed
+                    CLOUD, "DEFAULT_USER_DATA", missing / "user-data.txt",
+                ),
+                mock.patch.object(
+                    CLOUD.subprocess, "run",
+                    side_effect=self._query_subprocess(queried),
                 ) as run,
             ):
                 result = CLOUD.query_cloud_init()
-        run.assert_called_once_with(
+        self.assertEqual(
+            run.call_args_list[0].args[0][:3],
             ["cloud-init", "query", "--all"],
-            check=True, text=True, capture_output=True,
+        )
+        self.assertEqual(
+            run.call_args_list[1].args[0],
+            ["cloud-init", "query", "userdata"],
         )
         normalized = CLOUD.normalize(result)
         self.assertEqual(normalized["ssh_authorized_keys"], [key])
@@ -122,22 +149,10 @@ class CloudInitAdapterTests(unittest.TestCase):
         self.assertNotIn("cloud-config.txt", MODULE.read_text(encoding="utf-8"))
 
     def test_query_falls_back_to_cached_raw_userdata(self):
-        key = (
-            "ssh-ed25519 "
-            "AAAAC3NzaC1lZDI1NTE5AAAAICBnQ0Cpsm3s4XD6Pt26+URfM2kB5an6zP2ri6PRyPdm "
-            "admin@test"
-        )
+        key = self._cloud_config_key()
         with tempfile.TemporaryDirectory() as directory:
             user_data = Path(directory, "user-data.txt")
-            user_data.write_text(
-                "#cloud-config\n"
-                f"ssh_authorized_keys:\n  - {key}\n",
-                encoding="utf-8",
-            )
-            completed = mock.Mock(stdout=json.dumps({
-                "instance_id": "cloud-query-i-3",
-                "public_ssh_keys": [],
-            }))
+            user_data.write_text(self._cloud_config_text(key), encoding="utf-8")
             with (
                 mock.patch.object(CLOUD, "DEFAULT_USER_DATA", user_data),
                 mock.patch.object(
@@ -149,11 +164,147 @@ class CloudInitAdapterTests(unittest.TestCase):
                     Path(directory, "network-config"),
                 ),
                 mock.patch.object(
-                    CLOUD.subprocess, "run", return_value=completed
+                    CLOUD.subprocess, "run",
+                    side_effect=self._query_subprocess({
+                        "instance_id": "cloud-query-i-3",
+                        "public_ssh_keys": [],
+                    }),
                 ),
             ):
                 result = CLOUD.query_cloud_init()
         self.assertEqual(CLOUD.normalize(result)["ssh_authorized_keys"], [key])
+
+    def test_query_prefers_official_userdata_query(self):
+        key = self._cloud_config_key()
+        with tempfile.TemporaryDirectory() as directory:
+            missing = Path(directory)
+            with (
+                mock.patch.object(
+                    CLOUD, "DEFAULT_USER_DATA", missing / "user-data.txt",
+                ),
+                mock.patch.object(
+                    CLOUD, "DEFAULT_NETWORK_CONFIG_JSON",
+                    missing / "network-config.json",
+                ),
+                mock.patch.object(
+                    CLOUD, "DEFAULT_NETWORK_CONFIG",
+                    missing / "network-config",
+                ),
+                mock.patch.object(
+                    CLOUD.subprocess, "run",
+                    side_effect=self._query_subprocess(
+                        {
+                            "instance_id": "cloud-query-i-4",
+                            "public_ssh_keys": [],
+                            "userdata": "redacted",
+                        },
+                        userdata_stdout=self._cloud_config_text(key),
+                    ),
+                ),
+            ):
+                result = CLOUD.query_cloud_init()
+        self.assertEqual(CLOUD.normalize(result)["ssh_authorized_keys"], [key])
+
+    def test_query_treats_empty_or_redacted_userdata_as_missing(self):
+        key = self._cloud_config_key()
+        with tempfile.TemporaryDirectory() as directory:
+            user_data = Path(directory, "user-data.txt")
+            user_data.write_text(self._cloud_config_text(key), encoding="utf-8")
+            with (
+                mock.patch.object(CLOUD, "DEFAULT_USER_DATA", user_data),
+                mock.patch.object(
+                    CLOUD, "DEFAULT_NETWORK_CONFIG_JSON",
+                    Path(directory, "network-config.json"),
+                ),
+                mock.patch.object(
+                    CLOUD, "DEFAULT_NETWORK_CONFIG",
+                    Path(directory, "network-config"),
+                ),
+                mock.patch.object(
+                    CLOUD.subprocess, "run",
+                    side_effect=self._query_subprocess(
+                        {
+                            "instance_id": "cloud-query-i-5",
+                            "public_ssh_keys": [],
+                            "userdata": "",
+                        },
+                        userdata_stdout="redacted",
+                    ),
+                ),
+            ):
+                result = CLOUD.query_cloud_init()
+        normalized = CLOUD.normalize(result)
+        self.assertEqual(normalized["ssh_authorized_keys"], [key])
+        self.assertEqual(
+            normalized["freesense"]["management_cidrs"],
+            ["10.0.2.2/32"],
+        )
+
+    def test_apply_reimports_keys_after_zero_key_seal(self):
+        key = self._cloud_config_key()
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory, "config.xml")
+            state = Path(directory, "instance.json")
+            config.write_text(BASE_XML, encoding="utf-8")
+            empty = {
+                "schema_version": "freesense.cloud-metadata/v1",
+                "instance_id": "reimport-i-1",
+                "ssh_authorized_keys": [],
+                "network": {},
+                "freesense": {},
+            }
+            self.assertTrue(CLOUD.apply(empty, [{"name": "vtnet0", "mac": "02:00:00:00:00:01"}], config, state))
+            sealed = json.loads(state.read_text(encoding="utf-8"))
+            self.assertEqual(sealed["ssh_key_count"], 0)
+            with_keys = {
+                **empty,
+                "ssh_authorized_keys": [key],
+                "freesense": {"management_cidrs": ["10.0.2.2/32"]},
+                "_freesense_raw_user_data": self._cloud_config_text(key),
+            }
+            self.assertTrue(
+                CLOUD.apply(
+                    with_keys,
+                    [{"name": "vtnet0", "mac": "02:00:00:00:00:01"}],
+                    config,
+                    state,
+                )
+            )
+            root = ET.parse(config).getroot()
+            self.assertEqual(root.findtext("system/ssh/sshdkeyonly"), "enabled")
+            self.assertIn(
+                "FreeSense cloud temporary SSH",
+                [rule.findtext("descr") for rule in root.findall("filter/rule")],
+            )
+            self.assertEqual(
+                json.loads(state.read_text(encoding="utf-8"))["ssh_key_count"],
+                1,
+            )
+
+    def test_apply_rejects_cloud_config_keys_that_fail_to_import(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory, "config.xml")
+            state = Path(directory, "instance.json")
+            config.write_text(BASE_XML, encoding="utf-8")
+            with self.assertRaisesRegex(
+                CLOUD.InvalidMetadata,
+                "ssh_authorized_keys but none were imported",
+            ):
+                CLOUD.apply(
+                    {
+                        "schema_version": "freesense.cloud-metadata/v1",
+                        "instance_id": "reject-i-1",
+                        "ssh_authorized_keys": [],
+                        "network": {},
+                        "freesense": {},
+                        "_freesense_raw_user_data": (
+                            "#cloud-config\nssh_authorized_keys:\n  - not-a-key\n"
+                        ),
+                    },
+                    [{"name": "vtnet0", "mac": "02:00:00:00:00:01"}],
+                    config,
+                    state,
+                )
 
     def run_apply(self, fixture, detected):
         directory = tempfile.TemporaryDirectory()
