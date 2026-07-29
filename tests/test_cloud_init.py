@@ -93,10 +93,22 @@ class CloudInitAdapterTests(unittest.TestCase):
             ),
         }
         completed = mock.Mock(stdout=json.dumps(queried))
-        with mock.patch.object(
-            CLOUD.subprocess, "run", return_value=completed
-        ) as run:
-            result = CLOUD.query_cloud_init()
+        with tempfile.TemporaryDirectory() as directory:
+            missing = Path(directory)
+            with (
+                mock.patch.object(
+                    CLOUD, "DEFAULT_NETWORK_CONFIG_JSON",
+                    missing / "network-config.json",
+                ),
+                mock.patch.object(
+                    CLOUD, "DEFAULT_NETWORK_CONFIG",
+                    missing / "network-config",
+                ),
+                mock.patch.object(
+                    CLOUD.subprocess, "run", return_value=completed
+                ) as run,
+            ):
+                result = CLOUD.query_cloud_init()
         run.assert_called_once_with(
             ["cloud-init", "query", "--all"],
             check=True, text=True, capture_output=True,
@@ -128,6 +140,14 @@ class CloudInitAdapterTests(unittest.TestCase):
             }))
             with (
                 mock.patch.object(CLOUD, "DEFAULT_USER_DATA", user_data),
+                mock.patch.object(
+                    CLOUD, "DEFAULT_NETWORK_CONFIG_JSON",
+                    Path(directory, "network-config.json"),
+                ),
+                mock.patch.object(
+                    CLOUD, "DEFAULT_NETWORK_CONFIG",
+                    Path(directory, "network-config"),
+                ),
                 mock.patch.object(
                     CLOUD.subprocess, "run", return_value=completed
                 ),
