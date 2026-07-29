@@ -37,7 +37,7 @@ class CloudInitAdapterTests(unittest.TestCase):
     def test_wrapper_uses_ports_selected_python(self):
         makefile = PORT_MAKEFILE.read_text(encoding="utf-8")
         wrapper = WRAPPER_TEMPLATE.read_text(encoding="utf-8")
-        self.assertIn("PORTREVISION=\t4", makefile)
+        self.assertIn("PORTREVISION=\t5", makefile)
         self.assertIn("SUB_FILES=\tfreesense-cloud-init", makefile)
         self.assertIn("SUB_LIST=\tPYTHON_CMD=${PYTHON_CMD}", makefile)
         self.assertIn("${WRKDIR}/freesense-cloud-init", makefile)
@@ -61,6 +61,19 @@ class CloudInitAdapterTests(unittest.TestCase):
         with mock.patch.object(CLOUD.subprocess, "run") as run:
             CLOUD.initialize_cloud_init_local()
         run.assert_called_once_with(["cloud-init", "init", "--local"], check=True)
+
+    def test_normalize_preserves_cloud_config_authorized_keys(self):
+        key = (
+            "ssh-ed25519 "
+            "AAAAC3NzaC1lZDI1NTE5AAAAICBnQ0Cpsm3s4XD6Pt26+URfM2kB5an6zP2ri6PRyPdm "
+            "admin@test"
+        )
+        normalized = CLOUD.normalize({
+            "instance_id": "cloud-query-i-1",
+            "ssh_authorized_keys": [key],
+            "public_ssh_keys": ["ssh-rsa ignored"],
+        })
+        self.assertEqual(normalized["ssh_authorized_keys"], [key])
 
     def run_apply(self, fixture, detected):
         directory = tempfile.TemporaryDirectory()
