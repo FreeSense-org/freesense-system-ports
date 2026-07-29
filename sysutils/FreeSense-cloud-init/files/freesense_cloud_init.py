@@ -23,6 +23,9 @@ KEY = re.compile(
 ROLE = re.compile(r"^(wan|lan|opt[1-9][0-9]*)$")
 DEFAULT_CONFIG = Path("/conf/config.xml")
 DEFAULT_STATE = Path("/var/db/freesense-cloud-init/instance.json")
+DEFAULT_USER_DATA = Path("/var/lib/cloud/instance/user-data.txt")
+DEFAULT_NETWORK_CONFIG_JSON = Path("/var/lib/cloud/instance/network-config.json")
+DEFAULT_NETWORK_CONFIG = Path("/var/lib/cloud/instance/network-config")
 
 
 class InvalidMetadata(ValueError):
@@ -60,24 +63,27 @@ def query_cloud_init() -> dict:
         import yaml
     except ImportError as error:
         raise InvalidMetadata("cloud-init YAML support is unavailable") from error
-    for cloud_config in (
-        Path("/var/lib/cloud/instance/cloud-config.txt"),
-        Path("/var/lib/cloud/instance/user-data.txt"),
-    ):
-        if not cloud_config.is_file():
-            continue
+    user_data = value.get("userdata")
+    if user_data is None and DEFAULT_USER_DATA.is_file():
         try:
-            configured = yaml.safe_load(cloud_config.read_text(encoding="utf-8"))
-        except (ImportError, OSError, ValueError) as error:
+            user_data = DEFAULT_USER_DATA.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as error:
             raise InvalidMetadata(f"cloud-config is unreadable: {error}") from error
-        if isinstance(configured, dict):
-            for key in ("hostname", "fqdn", "timezone", "ssh_authorized_keys", "freesense"):
-                if key in configured:
-                    value[key] = configured[key]
-        break
+    if user_data not in (None, ""):
+        if not isinstance(user_data, str):
+            raise InvalidMetadata("cloud-config user-data must be UTF-8 text")
+        try:
+            configured = yaml.safe_load(user_data)
+        except yaml.YAMLError as error:
+            raise InvalidMetadata(f"cloud-config is unreadable: {error}") from error
+        if not isinstance(configured, dict):
+            raise InvalidMetadata("cloud-config user-data must be an object")
+        for key in ("hostname", "fqdn", "timezone", "ssh_authorized_keys", "freesense"):
+            if key in configured:
+                value[key] = configured[key]
     for network_config in (
-        Path("/var/lib/cloud/instance/network-config.json"),
-        Path("/var/lib/cloud/instance/network-config"),
+        DEFAULT_NETWORK_CONFIG_JSON,
+        DEFAULT_NETWORK_CONFIG,
     ):
         if not network_config.is_file():
             continue
