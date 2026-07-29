@@ -664,6 +664,60 @@ def detected_interfaces(path: Path | None) -> list[dict]:
     return result
 
 
+def run_cloud_init_modules() -> int:
+    """Run the full cloud-init module sequence used on first boot."""
+    for command in (
+        ("cloud-init", "init"),
+        ("cloud-init", "modules", "--mode", "config"),
+        ("cloud-init", "modules", "--mode", "final"),
+    ):
+        completed = subprocess.run(command, check=False)
+        if completed.returncode != 0:
+            return completed.returncode
+    return 0
+
+
+def activate_cloud_runtime() -> None:
+    """Apply late key/CIDR imports to the live filter and SSH service.
+
+    Early boot may seal an instance before NoCloud user-data is readable.
+    Final phase re-imports after full cloud-init; this makes the temporary
+    WAN SSH rule and authorized keys take effect without another reboot.
+    """
+    account_script = (
+        "require_once('config.inc');"
+        "require_once('functions.inc');"
+        "require_once('auth.inc');"
+        "local_reset_accounts();"
+    )
+    for command in (
+        ["/usr/local/bin/php-cgi", "-r", account_script],
+        ["/etc/rc.filter_configure_sync"],
+        ["/etc/sshd"],
+    ):
+        subprocess.run(command, check=False)
+
+
+def provision(
+    *,
+    input_path: Path | None,
+    interfaces: Path | None,
+    config: Path,
+    state: Path,
+    initialize_local: bool,
+) -> bool:
+    """Query cloud-init (or a fixture) and apply native FreeSense config."""
+    if input_path is None and initialize_local:
+        initialize_cloud_init_local()
+    raw = load_json(input_path) if input_path else query_cloud_init()
+    return apply(
+        normalize(raw),
+        detected_interfaces(interfaces),
+        config,
+        state,
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("phase", choices=("early", "final"))
@@ -673,23 +727,40 @@ def main() -> int:
     parser.add_argument("--state", type=Path, default=DEFAULT_STATE)
     args = parser.parse_args()
     if args.phase == "final":
-        for command in (
-            ("cloud-init", "init"),
-            ("cloud-init", "modules", "--mode", "config"),
-            ("cloud-init", "modules", "--mode", "final"),
-        ):
-            completed = subprocess.run(
-                command, check=False
+        status = run_cloud_init_modules()
+        if status != 0:
+            return status
+        try:
+            # Full cloud-init has already populated userdata caches. Re-apply so
+            # keys/CIDRs that were missing during early boot become live.
+            changed = provision(
+                input_path=args.input,
+                interfaces=args.interfaces,
+                config=args.config,
+                state=args.state,
+                initialize_local=False,
             )
-            if completed.returncode != 0:
-                return completed.returncode
+            if changed:
+                activate_cloud_runtime()
+        except (
+            InvalidMetadata,
+            ET.ParseError,
+            OSError,
+            subprocess.SubprocessError,
+            json.JSONDecodeError,
+        ) as error:
+            print(f"freesense-cloud-init: {error}", file=os.sys.stderr)
+            return 1
         subprocess.run(["service", "qemu-guest-agent", "onestart"], check=False)
         return 0
     try:
-        if not args.input:
-            initialize_cloud_init_local()
-        raw = load_json(args.input) if args.input else query_cloud_init()
-        apply(normalize(raw), detected_interfaces(args.interfaces), args.config, args.state)
+        provision(
+            input_path=args.input,
+            interfaces=args.interfaces,
+            config=args.config,
+            state=args.state,
+            initialize_local=args.input is None,
+        )
     except (InvalidMetadata, ET.ParseError, OSError, subprocess.SubprocessError, json.JSONDecodeError) as error:
         print(f"freesense-cloud-init: {error}", file=os.sys.stderr)
         return 1
