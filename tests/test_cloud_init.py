@@ -1,6 +1,7 @@
 import importlib.util
 import json
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -37,7 +38,7 @@ class CloudInitAdapterTests(unittest.TestCase):
     def test_wrapper_uses_ports_selected_python(self):
         makefile = PORT_MAKEFILE.read_text(encoding="utf-8")
         wrapper = WRAPPER_TEMPLATE.read_text(encoding="utf-8")
-        self.assertIn("PORTREVISION=\t7", makefile)
+        self.assertIn("PORTREVISION=\t8", makefile)
         self.assertIn("SUB_FILES=\tfreesense-cloud-init", makefile)
         self.assertIn("SUB_LIST=\tPYTHON_CMD=${PYTHON_CMD}", makefile)
         self.assertIn("${WRKDIR}/freesense-cloud-init", makefile)
@@ -56,6 +57,82 @@ class CloudInitAdapterTests(unittest.TestCase):
             module,
         )
         self.assertNotIn('["service", "qemu_guest_agent", "onestart"]', module)
+
+    def test_final_phase_reapplies_after_full_cloud_init(self):
+        key = self._cloud_config_key()
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory, "config.xml")
+            state = Path(directory, "instance.json")
+            config.write_text(BASE_XML, encoding="utf-8")
+            # Early seal without keys, as when NoCloud user-data is not ready.
+            empty = {
+                "schema_version": "freesense.cloud-metadata/v1",
+                "instance_id": "final-reapply-i-1",
+                "ssh_authorized_keys": [],
+                "network": {},
+                "freesense": {},
+            }
+            self.assertTrue(
+                CLOUD.apply(
+                    empty,
+                    [{"name": "vtnet0", "mac": "02:00:00:00:00:01"}],
+                    config,
+                    state,
+                )
+            )
+            late = {
+                **empty,
+                "ssh_authorized_keys": [key],
+                "freesense": {"management_cidrs": ["10.0.2.2/32"]},
+                "_freesense_raw_user_data": self._cloud_config_text(key),
+            }
+            runs: list[list[str]] = []
+
+            def record(cmd, check=False, **_kwargs):
+                runs.append(list(cmd))
+                return mock.Mock(returncode=0)
+
+            with (
+                mock.patch.object(CLOUD.subprocess, "run", side_effect=record),
+                mock.patch.object(CLOUD, "query_cloud_init", return_value=late),
+                mock.patch.object(
+                    CLOUD,
+                    "detected_interfaces",
+                    return_value=[{"name": "vtnet0", "mac": "02:00:00:00:00:01"}],
+                ),
+                mock.patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "freesense-cloud-init",
+                        "final",
+                        "--config",
+                        str(config),
+                        "--state",
+                        str(state),
+                    ],
+                ),
+            ):
+                self.assertEqual(CLOUD.main(), 0)
+            root = ET.parse(config).getroot()
+            self.assertEqual(root.findtext("system/ssh/sshdkeyonly"), "enabled")
+            self.assertIn(
+                "FreeSense cloud temporary SSH",
+                [rule.findtext("descr") for rule in root.findall("filter/rule")],
+            )
+            self.assertIn(["cloud-init", "init"], runs)
+            self.assertIn(["cloud-init", "modules", "--mode", "final"], runs)
+            self.assertIn(["/etc/rc.filter_configure_sync"], runs)
+            self.assertIn(["/etc/sshd"], runs)
+            self.assertTrue(
+                any(cmd[:2] == ["service", "qemu-guest-agent"] for cmd in runs)
+            )
+            self.assertTrue(
+                any(
+                    cmd[:2] == ["/usr/local/bin/php-cgi", "-r"]
+                    for cmd in runs
+                )
+            )
 
     def test_local_datasource_is_initialized_before_query(self):
         with mock.patch.object(CLOUD.subprocess, "run") as run:
