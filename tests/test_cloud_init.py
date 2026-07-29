@@ -37,7 +37,7 @@ class CloudInitAdapterTests(unittest.TestCase):
     def test_wrapper_uses_ports_selected_python(self):
         makefile = PORT_MAKEFILE.read_text(encoding="utf-8")
         wrapper = WRAPPER_TEMPLATE.read_text(encoding="utf-8")
-        self.assertIn("PORTREVISION=\t5", makefile)
+        self.assertIn("PORTREVISION=\t6", makefile)
         self.assertIn("SUB_FILES=\tfreesense-cloud-init", makefile)
         self.assertIn("SUB_LIST=\tPYTHON_CMD=${PYTHON_CMD}", makefile)
         self.assertIn("${WRKDIR}/freesense-cloud-init", makefile)
@@ -74,6 +74,66 @@ class CloudInitAdapterTests(unittest.TestCase):
             "public_ssh_keys": ["ssh-rsa ignored"],
         })
         self.assertEqual(normalized["ssh_authorized_keys"], [key])
+
+    def test_query_uses_raw_userdata_instead_of_generated_cloud_config(self):
+        key = (
+            "ssh-ed25519 "
+            "AAAAC3NzaC1lZDI1NTE5AAAAICBnQ0Cpsm3s4XD6Pt26+URfM2kB5an6zP2ri6PRyPdm "
+            "admin@test"
+        )
+        queried = {
+            "instance_id": "cloud-query-i-2",
+            "public_ssh_keys": [],
+            "userdata": (
+                "#cloud-config\n"
+                f"ssh_authorized_keys:\n  - {key}\n"
+                "freesense:\n"
+                "  management_cidrs:\n"
+                "    - 10.0.2.2/32\n"
+            ),
+        }
+        completed = mock.Mock(stdout=json.dumps(queried))
+        with mock.patch.object(
+            CLOUD.subprocess, "run", return_value=completed
+        ) as run:
+            result = CLOUD.query_cloud_init()
+        run.assert_called_once_with(
+            ["cloud-init", "query", "--all"],
+            check=True, text=True, capture_output=True,
+        )
+        normalized = CLOUD.normalize(result)
+        self.assertEqual(normalized["ssh_authorized_keys"], [key])
+        self.assertEqual(
+            normalized["freesense"]["management_cidrs"],
+            ["10.0.2.2/32"],
+        )
+        self.assertNotIn("cloud-config.txt", MODULE.read_text(encoding="utf-8"))
+
+    def test_query_falls_back_to_cached_raw_userdata(self):
+        key = (
+            "ssh-ed25519 "
+            "AAAAC3NzaC1lZDI1NTE5AAAAICBnQ0Cpsm3s4XD6Pt26+URfM2kB5an6zP2ri6PRyPdm "
+            "admin@test"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            user_data = Path(directory, "user-data.txt")
+            user_data.write_text(
+                "#cloud-config\n"
+                f"ssh_authorized_keys:\n  - {key}\n",
+                encoding="utf-8",
+            )
+            completed = mock.Mock(stdout=json.dumps({
+                "instance_id": "cloud-query-i-3",
+                "public_ssh_keys": [],
+            }))
+            with (
+                mock.patch.object(CLOUD, "DEFAULT_USER_DATA", user_data),
+                mock.patch.object(
+                    CLOUD.subprocess, "run", return_value=completed
+                ),
+            ):
+                result = CLOUD.query_cloud_init()
+        self.assertEqual(CLOUD.normalize(result)["ssh_authorized_keys"], [key])
 
     def run_apply(self, fixture, detected):
         directory = tempfile.TemporaryDirectory()
