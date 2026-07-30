@@ -38,7 +38,7 @@ class CloudInitAdapterTests(unittest.TestCase):
     def test_wrapper_uses_ports_selected_python(self):
         makefile = PORT_MAKEFILE.read_text(encoding="utf-8")
         wrapper = WRAPPER_TEMPLATE.read_text(encoding="utf-8")
-        self.assertIn("PORTREVISION=\t8", makefile)
+        self.assertIn("PORTREVISION=\t9", makefile)
         self.assertIn("SUB_FILES=\tfreesense-cloud-init", makefile)
         self.assertIn("SUB_LIST=\tPYTHON_CMD=${PYTHON_CMD}", makefile)
         self.assertIn("${WRKDIR}/freesense-cloud-init", makefile)
@@ -123,7 +123,11 @@ class CloudInitAdapterTests(unittest.TestCase):
             self.assertIn(["cloud-init", "init"], runs)
             self.assertIn(["cloud-init", "modules", "--mode", "final"], runs)
             self.assertIn(["/etc/rc.filter_configure_sync"], runs)
-            self.assertIn(["/etc/sshd"], runs)
+            self.assertIn(
+                ["/usr/local/bin/php-cgi", "-f", "/etc/sshd"],
+                runs,
+            )
+            self.assertNotIn(["/etc/sshd"], runs)
             self.assertTrue(
                 any(cmd[:2] == ["service", "qemu-guest-agent"] for cmd in runs)
             )
@@ -133,6 +137,40 @@ class CloudInitAdapterTests(unittest.TestCase):
                     for cmd in runs
                 )
             )
+
+    def test_final_phase_continues_after_recoverable_cloud_init_error(self):
+        runs: list[list[str]] = []
+        statuses = iter((0, 0, 2, 0))
+
+        def record(cmd, check=False, **_kwargs):
+            runs.append(list(cmd))
+            return mock.Mock(returncode=next(statuses))
+
+        with (
+            mock.patch.object(CLOUD.subprocess, "run", side_effect=record),
+            mock.patch.object(CLOUD, "provision", return_value=False) as provision,
+            mock.patch.object(sys, "argv", ["freesense-cloud-init", "final"]),
+        ):
+            self.assertEqual(CLOUD.main(), 0)
+        provision.assert_called_once()
+        self.assertIn(["cloud-init", "modules", "--mode", "final"], runs)
+        self.assertIn(["service", "qemu-guest-agent", "onestart"], runs)
+
+    def test_final_phase_starts_guest_agent_after_fatal_cloud_init_error(self):
+        runs: list[list[str]] = []
+
+        def record(cmd, check=False, **_kwargs):
+            runs.append(list(cmd))
+            return mock.Mock(returncode=1)
+
+        with (
+            mock.patch.object(CLOUD.subprocess, "run", side_effect=record),
+            mock.patch.object(CLOUD, "provision") as provision,
+            mock.patch.object(sys, "argv", ["freesense-cloud-init", "final"]),
+        ):
+            self.assertEqual(CLOUD.main(), 1)
+        provision.assert_not_called()
+        self.assertIn(["service", "qemu-guest-agent", "onestart"], runs)
 
     def test_local_datasource_is_initialized_before_query(self):
         with mock.patch.object(CLOUD.subprocess, "run") as run:
