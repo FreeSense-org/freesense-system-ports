@@ -665,14 +665,27 @@ def detected_interfaces(path: Path | None) -> list[dict]:
 
 
 def run_cloud_init_modules() -> int:
-    """Run the full cloud-init module sequence used on first boot."""
+    """Run first-boot modules, tolerating cloud-init's degraded exit code."""
     for command in (
         ("cloud-init", "init"),
         ("cloud-init", "modules", "--mode", "config"),
         ("cloud-init", "modules", "--mode", "final"),
     ):
         completed = subprocess.run(command, check=False)
+        if completed.returncode == 2:
+            print(
+                "freesense-cloud-init: "
+                f"{' '.join(command)} completed with recoverable errors (rc=2); "
+                "continuing native provisioning",
+                file=os.sys.stderr,
+            )
+            continue
         if completed.returncode != 0:
+            print(
+                "freesense-cloud-init: "
+                f"{' '.join(command)} failed (rc={completed.returncode})",
+                file=os.sys.stderr,
+            )
             return completed.returncode
     return 0
 
@@ -693,7 +706,7 @@ def activate_cloud_runtime() -> None:
     for command in (
         ["/usr/local/bin/php-cgi", "-r", account_script],
         ["/etc/rc.filter_configure_sync"],
-        ["/etc/sshd"],
+        ["/usr/local/bin/php-cgi", "-f", "/etc/sshd"],
     ):
         subprocess.run(command, check=False)
 
@@ -727,10 +740,10 @@ def main() -> int:
     parser.add_argument("--state", type=Path, default=DEFAULT_STATE)
     args = parser.parse_args()
     if args.phase == "final":
-        status = run_cloud_init_modules()
-        if status != 0:
-            return status
         try:
+            status = run_cloud_init_modules()
+            if status != 0:
+                return status
             # Full cloud-init has already populated userdata caches. Re-apply so
             # keys/CIDRs that were missing during early boot become live.
             changed = provision(
@@ -751,7 +764,8 @@ def main() -> int:
         ) as error:
             print(f"freesense-cloud-init: {error}", file=os.sys.stderr)
             return 1
-        subprocess.run(["service", "qemu-guest-agent", "onestart"], check=False)
+        finally:
+            subprocess.run(["service", "qemu-guest-agent", "onestart"], check=False)
         return 0
     try:
         provision(
