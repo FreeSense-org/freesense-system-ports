@@ -155,6 +155,7 @@ def normalize(raw: dict) -> dict:
         return raw
     ds = raw.get("ds", {}) if isinstance(raw.get("ds"), dict) else {}
     meta = ds.get("meta_data", {}) if isinstance(ds.get("meta_data"), dict) else {}
+    v1 = raw.get("v1", {}) if isinstance(raw.get("v1"), dict) else {}
     network = (
         raw.get("network")
         or ds.get("network_json")
@@ -169,7 +170,18 @@ def normalize(raw: dict) -> dict:
     normalized = {
         "schema_version": "freesense.cloud-metadata/v1",
         "instance_id": raw.get("instance_id") or meta.get("instance-id") or meta.get("uuid"),
-        "hostname": raw.get("fqdn") or raw.get("hostname") or meta.get("hostname"),
+        "hostname": (
+            raw.get("fqdn")
+            or raw.get("hostname")
+            or raw.get("local_hostname")
+            or raw.get("local-hostname")
+            or meta.get("hostname")
+            or meta.get("local_hostname")
+            or meta.get("local-hostname")
+            or v1.get("hostname")
+            or v1.get("local_hostname")
+            or v1.get("local-hostname")
+        ),
         "timezone": raw.get("timezone"),
         "ssh_authorized_keys": keys,
         "network": network,

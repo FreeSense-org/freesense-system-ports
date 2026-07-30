@@ -38,7 +38,7 @@ class CloudInitAdapterTests(unittest.TestCase):
     def test_wrapper_uses_ports_selected_python(self):
         makefile = PORT_MAKEFILE.read_text(encoding="utf-8")
         wrapper = WRAPPER_TEMPLATE.read_text(encoding="utf-8")
-        self.assertIn("PORTREVISION=\t9", makefile)
+        self.assertIn("PORTREVISION=\t10", makefile)
         self.assertIn("SUB_FILES=\tfreesense-cloud-init", makefile)
         self.assertIn("SUB_LIST=\tPYTHON_CMD=${PYTHON_CMD}", makefile)
         self.assertIn("${WRKDIR}/freesense-cloud-init", makefile)
@@ -189,6 +189,25 @@ class CloudInitAdapterTests(unittest.TestCase):
             "public_ssh_keys": ["ssh-rsa ignored"],
         })
         self.assertEqual(normalized["ssh_authorized_keys"], [key])
+
+    def test_normalize_reads_standard_nocloud_local_hostname(self):
+        variants = (
+            (
+                {"local_hostname": "top-level.example.test"},
+                "top-level.example.test",
+            ),
+            (
+                {"ds": {"meta_data": {"local-hostname": "metadata.example.test"}}},
+                "metadata.example.test",
+            ),
+            (
+                {"v1": {"local_hostname": "instance-data.example.test"}},
+                "instance-data.example.test",
+            ),
+        )
+        for raw, expected in variants:
+            with self.subTest(raw=raw):
+                self.assertEqual(CLOUD.normalize(raw)["hostname"], expected)
 
     def _cloud_config_key(self):
         return (
