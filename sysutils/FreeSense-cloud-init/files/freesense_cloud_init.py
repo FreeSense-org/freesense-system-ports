@@ -526,6 +526,10 @@ def apply(metadata: dict, detected: list[dict], config_path: Path, state_path: P
     tree = ET.parse(config_path)
     root = tree.getroot()
     system = child(root, "system")
+    if len(assignments) == 1:
+        # FreeSense otherwise puts its anti-lockout rule on the sole WAN
+        # interface, exposing the WebUI and SSH to every source.
+        set_text(child(system, "webgui"), "noantilockout", "true")
     hostname = metadata.get("hostname")
     if hostname:
         if not isinstance(hostname, str) or len(hostname) > 253:
@@ -716,7 +720,7 @@ def activate_cloud_runtime() -> None:
         "local_reset_accounts();"
     )
     for command in (
-        ["/usr/local/bin/php-cgi", "-r", account_script],
+        ["/usr/local/bin/php", "-r", account_script],
         ["/etc/rc.filter_configure_sync"],
         ["/usr/local/bin/php-cgi", "-f", "/etc/sshd"],
     ):

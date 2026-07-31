@@ -38,7 +38,7 @@ class CloudInitAdapterTests(unittest.TestCase):
     def test_wrapper_uses_ports_selected_python(self):
         makefile = PORT_MAKEFILE.read_text(encoding="utf-8")
         wrapper = WRAPPER_TEMPLATE.read_text(encoding="utf-8")
-        self.assertIn("PORTREVISION=\t10", makefile)
+        self.assertIn("PORTREVISION=\t11", makefile)
         self.assertIn("SUB_FILES=\tfreesense-cloud-init", makefile)
         self.assertIn("SUB_LIST=\tPYTHON_CMD=${PYTHON_CMD}", makefile)
         self.assertIn("${WRKDIR}/freesense-cloud-init", makefile)
@@ -132,6 +132,12 @@ class CloudInitAdapterTests(unittest.TestCase):
                 any(cmd[:2] == ["service", "qemu-guest-agent"] for cmd in runs)
             )
             self.assertTrue(
+                any(
+                    cmd[:2] == ["/usr/local/bin/php", "-r"]
+                    for cmd in runs
+                )
+            )
+            self.assertFalse(
                 any(
                     cmd[:2] == ["/usr/local/bin/php-cgi", "-r"]
                     for cmd in runs
@@ -475,6 +481,7 @@ class CloudInitAdapterTests(unittest.TestCase):
         self.assertIsNone(root.find("system/user/bcrypt-hash"))
         self.assertEqual(root.findtext("system/user/password"), "*LOCKED*")
         self.assertEqual(root.findtext("system/ssh/sshdkeyonly"), "enabled")
+        self.assertIsNone(root.find("system/webgui/noantilockout"))
         self.assertNotIn(
             "FreeSense cloud temporary SSH",
             [rule.findtext("descr") for rule in root.findall("filter/rule")],
@@ -498,6 +505,10 @@ class CloudInitAdapterTests(unittest.TestCase):
         self.assertEqual(rules[0].findtext("destination/port"), "22")
         self.assertEqual(rules[0].findtext("source/address"), "203.0.113.10/32")
         self.assertIsNone(rules[0].find("destination/port[.='443']"))
+        self.assertEqual(
+            root.findtext("system/webgui/noantilockout"),
+            "true",
+        )
 
     def test_no_key_never_creates_wan_management(self):
         raw = json.loads((FIXTURES / "configdrive-one-nic.json").read_text())
@@ -516,6 +527,10 @@ class CloudInitAdapterTests(unittest.TestCase):
                 [rule.findtext("descr") for rule in root.findall("filter/rule")],
             )
             self.assertIsNone(root.find("system/ssh"))
+            self.assertEqual(
+                root.findtext("system/webgui/noantilockout"),
+                "true",
+            )
 
     def test_ambiguous_mapping_does_not_rewrite_config(self):
         raw = json.loads((FIXTURES / "nocloud-two-nic.json").read_text())
