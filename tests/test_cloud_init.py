@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import types
 import unittest
 from unittest import mock
 import xml.etree.ElementTree as ET
@@ -38,7 +39,7 @@ class CloudInitAdapterTests(unittest.TestCase):
     def test_wrapper_uses_ports_selected_python(self):
         makefile = PORT_MAKEFILE.read_text(encoding="utf-8")
         wrapper = WRAPPER_TEMPLATE.read_text(encoding="utf-8")
-        self.assertIn("PORTREVISION=\t11", makefile)
+        self.assertIn("PORTREVISION=\t12", makefile)
         self.assertIn("SUB_FILES=\tfreesense-cloud-init", makefile)
         self.assertIn("SUB_LIST=\tPYTHON_CMD=${PYTHON_CMD}", makefile)
         self.assertIn("${WRKDIR}/freesense-cloud-init", makefile)
@@ -183,6 +184,42 @@ class CloudInitAdapterTests(unittest.TestCase):
             CLOUD.initialize_cloud_init_local()
         run.assert_called_once_with(["cloud-init", "init", "--local"], check=True)
 
+    def test_cached_datasource_supplies_freebsd_network_config(self):
+        expected = {
+            "version": 2,
+            "ethernets": {
+                "wan": {"dhcp4": True},
+                "lan": {"dhcp4": True},
+            },
+        }
+        calls = []
+
+        class FakeInit:
+            def __init__(self, ds_deps):
+                calls.append(("init", ds_deps))
+
+            def fetch(self, existing):
+                calls.append(("fetch", existing))
+                return types.SimpleNamespace(network_config=expected)
+
+        sources = types.ModuleType("cloudinit.sources")
+        sources.DEP_FILESYSTEM = "FILESYSTEM"
+        stages = types.ModuleType("cloudinit.stages")
+        stages.Init = FakeInit
+        cloudinit = types.ModuleType("cloudinit")
+        cloudinit.__path__ = []
+        cloudinit.sources = sources
+        with mock.patch.dict(
+            sys.modules,
+            {
+                "cloudinit": cloudinit,
+                "cloudinit.sources": sources,
+                "cloudinit.stages": stages,
+            },
+        ):
+            self.assertEqual(CLOUD.load_cached_network_config(), expected)
+        self.assertEqual(calls, [("init", ["FILESYSTEM"]), ("fetch", "trust")])
+
     def test_normalize_preserves_cloud_config_authorized_keys(self):
         key = (
             "ssh-ed25519 "
@@ -267,6 +304,9 @@ class CloudInitAdapterTests(unittest.TestCase):
                     CLOUD, "DEFAULT_USER_DATA", missing / "user-data.txt",
                 ),
                 mock.patch.object(
+                    CLOUD, "load_cached_network_config", return_value=None,
+                ),
+                mock.patch.object(
                     CLOUD.subprocess, "run",
                     side_effect=self._query_subprocess(queried),
                 ) as run,
@@ -304,6 +344,9 @@ class CloudInitAdapterTests(unittest.TestCase):
                     Path(directory, "network-config"),
                 ),
                 mock.patch.object(
+                    CLOUD, "load_cached_network_config", return_value=None,
+                ),
+                mock.patch.object(
                     CLOUD.subprocess, "run",
                     side_effect=self._query_subprocess({
                         "instance_id": "cloud-query-i-3",
@@ -329,6 +372,9 @@ class CloudInitAdapterTests(unittest.TestCase):
                 mock.patch.object(
                     CLOUD, "DEFAULT_NETWORK_CONFIG",
                     missing / "network-config",
+                ),
+                mock.patch.object(
+                    CLOUD, "load_cached_network_config", return_value=None,
                 ),
                 mock.patch.object(
                     CLOUD.subprocess, "run",
@@ -361,6 +407,9 @@ class CloudInitAdapterTests(unittest.TestCase):
                     Path(directory, "network-config"),
                 ),
                 mock.patch.object(
+                    CLOUD, "load_cached_network_config", return_value=None,
+                ),
+                mock.patch.object(
                     CLOUD.subprocess, "run",
                     side_effect=self._query_subprocess(
                         {
@@ -379,6 +428,43 @@ class CloudInitAdapterTests(unittest.TestCase):
             normalized["freesense"]["management_cidrs"],
             ["10.0.2.2/32"],
         )
+
+    def test_query_uses_cached_datasource_network_when_files_are_absent(self):
+        network = {
+            "version": 2,
+            "ethernets": {
+                "wan": {"dhcp4": True},
+                "lan": {"dhcp4": True},
+            },
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            missing = Path(directory)
+            with (
+                mock.patch.object(
+                    CLOUD, "DEFAULT_USER_DATA", missing / "user-data.txt",
+                ),
+                mock.patch.object(
+                    CLOUD, "DEFAULT_NETWORK_CONFIG_JSON",
+                    missing / "network-config.json",
+                ),
+                mock.patch.object(
+                    CLOUD, "DEFAULT_NETWORK_CONFIG",
+                    missing / "network-config",
+                ),
+                mock.patch.object(
+                    CLOUD, "load_cached_network_config", return_value=network,
+                ),
+                mock.patch.object(
+                    CLOUD.subprocess,
+                    "run",
+                    side_effect=self._query_subprocess({
+                        "instance_id": "cloud-query-network-i-1",
+                        "public_ssh_keys": [],
+                    }),
+                ),
+            ):
+                result = CLOUD.query_cloud_init()
+        self.assertEqual(result["network"], network)
 
     def test_apply_reimports_keys_after_zero_key_seal(self):
         key = self._cloud_config_key()
