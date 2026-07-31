@@ -110,6 +110,31 @@ def merge_cloud_config(value: dict, user_data: str | None) -> dict:
     return value
 
 
+def load_cached_network_config() -> dict | None:
+    """Read the datasource network config from cloud-init's trusted cache.
+
+    FreeBSD cloud-init 25.2 keeps this data on the cached datasource object but
+    does not expose it through ``cloud-init query`` or write the Linux-style
+    ``instance/network-config`` files.  Reuse cloud-init's own cache loader so
+    multi-interface metadata remains available to the native adapter.
+    """
+    try:
+        from cloudinit import sources
+        from cloudinit.stages import Init
+    except ImportError as error:
+        raise InvalidMetadata("cloud-init Python API is unavailable") from error
+    try:
+        datasource = Init(ds_deps=[sources.DEP_FILESYSTEM]).fetch(existing="trust")
+        network = datasource.network_config
+    except Exception as error:
+        raise InvalidMetadata(f"cached cloud-init network data is unavailable: {error}") from error
+    if network is None:
+        return None
+    if not isinstance(network, dict):
+        raise InvalidMetadata("cached cloud-init network data is not an object")
+    return network
+
+
 def query_cloud_init() -> dict:
     fixture = os.environ.get("FREESENSE_CLOUD_INIT_INPUT")
     if fixture:
@@ -126,6 +151,7 @@ def query_cloud_init() -> dict:
     except ImportError as error:
         raise InvalidMetadata("cloud-init YAML support is unavailable") from error
     value = merge_cloud_config(value, load_raw_user_data(value))
+    network = None
     for network_config in (
         DEFAULT_NETWORK_CONFIG_JSON,
         DEFAULT_NETWORK_CONFIG,
@@ -134,13 +160,17 @@ def query_cloud_init() -> dict:
             continue
         try:
             text = network_config.read_text(encoding="utf-8")
-            value["network"] = (
+            network = (
                 json.loads(text) if network_config.suffix == ".json"
                 else yaml.safe_load(text)
             )
         except (OSError, ValueError) as error:
             raise InvalidMetadata(f"network-config is unreadable: {error}") from error
         break
+    if network is None:
+        network = load_cached_network_config()
+    if network is not None:
+        value["network"] = network
     return value
 
 
