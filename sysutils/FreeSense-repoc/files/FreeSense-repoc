@@ -18,9 +18,37 @@ read_global() {
 PRODUCT="${PRODUCT:-$(read_global product_name FreeSense)}"
 REPOS_DIR="${REPOS_DIR:-$(read_global pkg_repos_path "/usr/local/etc/${PRODUCT}/pkg/repos")}"
 SHARE_DIR="${SHARE_DIR:-/usr/local/share/${PRODUCT}}"
-MANIFEST_URL="${MANIFEST_URL:-https://pkg.freesense.org/v1/repos.manifest.json}"
-MANIFEST_LOCAL="${MANIFEST_LOCAL:-${SHARE_DIR}/repos.manifest.json}"
-MANIFEST_CACHE="${MANIFEST_CACHE:-/cf/conf/${PRODUCT}-repos.manifest.json}"
+MANIFEST_URL_CONFIGURED="${MANIFEST_URL+x}"
+MACHINE_ARCH="${MACHINE_ARCH:-$(uname -m)}"
+PROCESSOR_ARCH="${PROCESSOR_ARCH:-$(uname -p)}"
+case "${MACHINE_ARCH}:${PROCESSOR_ARCH}" in
+	amd64:amd64)
+		PACKAGE_ARCH=amd64
+		EXPECTED_ABI='FreeBSD:([0-9]+):amd64'
+		EXPECTED_ALTABI='freebsd:([0-9]+):x86:64'
+		;;
+	x86_64:*)
+		# Test/development hosts use Linux naming; installed FreeBSD systems do not.
+		MACHINE_ARCH=amd64
+		PROCESSOR_ARCH=amd64
+		PACKAGE_ARCH=amd64
+		EXPECTED_ABI='FreeBSD:([0-9]+):amd64'
+		EXPECTED_ALTABI='freebsd:([0-9]+):x86:64'
+		;;
+	arm64:aarch64)
+		PACKAGE_ARCH=aarch64
+		EXPECTED_ABI='FreeBSD:([0-9]+):aarch64'
+		EXPECTED_ALTABI='freebsd:([0-9]+):aarch64:64'
+		;;
+	*)
+		echo "FreeSense-repoc: unsupported runtime architecture ${MACHINE_ARCH}/${PROCESSOR_ARCH}" >&2
+		exit 1
+		;;
+esac
+MANIFEST_URL="${MANIFEST_URL:-https://pkg.freesense.org/v1/repos.${PACKAGE_ARCH}.manifest.json}"
+MANIFEST_LEGACY_URL="${MANIFEST_LEGACY_URL:-https://pkg.freesense.org/v1/repos.manifest.json}"
+MANIFEST_LOCAL="${MANIFEST_LOCAL:-${SHARE_DIR}/repos.${PACKAGE_ARCH}.manifest.json}"
+MANIFEST_CACHE="${MANIFEST_CACHE:-/cf/conf/${PRODUCT}-repos.${PACKAGE_ARCH}.manifest.json}"
 CHANNEL_KEY="${CHANNEL_KEY:-${SHARE_DIR}/keys/channel/public.pem}"
 FETCH_TIMEOUT="${FETCH_TIMEOUT:-15}"
 LOCK_FILE="${LOCK_FILE:-/var/run/${PRODUCT}-repoc.lock}"
@@ -117,7 +145,7 @@ function safe_text($value) {
     return is_string($value) && $value !== "" &&
         !preg_match("/[|\\r\\n\\x00]/", $value);
 }
-function validate_component($component, $kind, $train, $schema) {
+function validate_component($component, $kind, $train, $schema, $package_arch) {
     if ($component === null) return null;
     if (!is_array($component)) invalid_payload(10);
     $fingerprint = $component["fingerprint"] ?? null;
@@ -127,13 +155,13 @@ function validate_component($component, $kind, $train, $schema) {
     $generation = $component["generation"] ?? null;
     if (!is_int($generation) || $generation <= 0) invalid_payload(13);
     $expected = "https://pkg.freesense.org/v1/artifacts/system/" .
-        $fingerprint . "/amd64";
+        $fingerprint . "/" . $package_arch;
     if ($kind === "system") {
         if (array_key_exists("system_fingerprint", $component) &&
             $component["system_fingerprint"] !== "") invalid_payload(15);
     } else {
         $expected = "https://pkg.freesense.org/v1/artifacts/packages/" .
-            $train . "/" . $fingerprint . "/amd64";
+            $train . "/" . $fingerprint . "/" . $package_arch;
     }
     if (in_array($schema, ["freesense.channels/v2", "freesense.channels/v3"], true)) {
         $pin = $component["freebsd_pin_id"] ?? null;
@@ -157,7 +185,7 @@ function channel_is_eligible($version, $installed) {
     [$installed_major, $installed_minor, $installed_patch] = version_parts($installed);
     return [$major, $minor, $patch] >= [$installed_major, $installed_minor, $installed_patch];
 }
-function validate_document($filename, $installed) {
+function validate_document($filename, $installed, $machine_arch, $package_arch, $expected_abi, $expected_altabi) {
     $raw = @file_get_contents($filename);
     if ($raw === false || $raw === "") invalid_payload(20);
     $doc = json_decode($raw, true);
@@ -183,6 +211,8 @@ function validate_document($filename, $installed) {
         $train = $channel["package_train"] ?? null;
         $abi = $channel["abi"] ?? null;
         $altabi = $channel["altabi"] ?? null;
+        $declared_arch = $channel["architecture"] ?? "amd64";
+        $declared_package_arch = $channel["package_arch"] ?? "amd64";
         $default = $channel["default"] ?? null;
         if (!safe_text($description) || !is_string($train) ||
             !preg_match("/^[0-9]+[.][0-9]+$/D", $train) ||
@@ -193,12 +223,13 @@ function validate_document($filename, $installed) {
         } else {
             $version = $train . ".0";
         }
-        if (!is_string($abi) || !is_string($altabi) ||
-            !preg_match("/^FreeBSD:([0-9]+):amd64$/D", $abi, $abi_parts) ||
-            !preg_match("/^freebsd:([0-9]+):x86:64$/D", $altabi, $altabi_parts) ||
+        if ($declared_arch !== $machine_arch || $declared_package_arch !== $package_arch ||
+            !is_string($abi) || !is_string($altabi) ||
+            !preg_match("/^" . $expected_abi . "$/D", $abi, $abi_parts) ||
+            !preg_match("/^" . $expected_altabi . "$/D", $altabi, $altabi_parts) ||
             $abi_parts[1] !== $altabi_parts[1]) invalid_payload(24);
-        $system = validate_component($channel["system"] ?? null, "system", $train, $schema);
-        $packages = validate_component($channel["packages"] ?? null, "packages", $train, $schema);
+        $system = validate_component($channel["system"] ?? null, "system", $train, $schema, $package_arch);
+        $packages = validate_component($channel["packages"] ?? null, "packages", $train, $schema, $package_arch);
         $osversion = $system["osversion"] ?? null;
         if ($osversion !== null && (
             !is_int($osversion) ||
@@ -267,12 +298,12 @@ function reject_generation_rollback($new_channel, $old_channel, $new_schema) {
                 ($old_channel["system"]["osversion"] ?? null)
     )) invalid_payload(35);
 }
-[$candidate, $rows, $complete, $eligible, $default_name] = validate_document($argv[1], $argv[5]);
+[$candidate, $rows, $complete, $eligible, $default_name] = validate_document($argv[1], $argv[5], $argv[6], $argv[7], $argv[8], $argv[9]);
 $selected = $argv[4] !== "" ? $argv[4] : $default_name;
 if (($eligible[$selected] ?? true) === false) $selected = $default_name;
 if (!isset($complete[$selected]) || !$complete[$selected] || !($eligible[$selected] ?? false)) invalid_payload(50);
 if ($argv[3] !== "" && file_exists($argv[3])) {
-    [$baseline, $_, $baseline_complete, $_baseline_eligible, $_default] = validate_document($argv[3], $argv[5]);
+    [$baseline, $_, $baseline_complete, $_baseline_eligible, $_default] = validate_document($argv[3], $argv[5], $argv[6], $argv[7], $argv[8], $argv[9]);
     if ($candidate["schema_version"] === "freesense.channels/v3" &&
         $baseline["schema_version"] === "freesense.channels/v3") {
         foreach ($candidate["channels"] as $name => $channel) {
@@ -290,7 +321,7 @@ if ($argv[3] !== "" && file_exists($argv[3])) {
 }
 $encoded = implode("\n", $rows) . "\n";
 if (@file_put_contents($argv[2], $encoded) !== strlen($encoded)) invalid_payload(40);
-' "${1}" "${2}" "${3:-}" "${4:-}" "${INSTALLED_VERSION}"
+' "${1}" "${2}" "${3:-}" "${4:-}" "${INSTALLED_VERSION}" "${MACHINE_ARCH}" "${PACKAGE_ARCH}" "${EXPECTED_ABI}" "${EXPECTED_ALTABI}"
 }
 
 persist_payload() {
@@ -338,8 +369,16 @@ load_fallback() {
 
 LIVE_PAYLOAD=""
 if [ -z "${NOFETCH}" ] && command -v curl >/dev/null 2>&1 && [ -r "${CHANNEL_KEY}" ]; then
-	if curl -fsS --proto '=https' --max-time "${FETCH_TIMEOUT}" \
-	    -o "${WORK}/envelope.json" "${MANIFEST_URL}" 2>/dev/null &&
+	manifest_fetch_url=${MANIFEST_URL}
+	if ! curl -fsS --proto '=https' --max-time "${FETCH_TIMEOUT}" \
+	    -o "${WORK}/envelope.json" "${manifest_fetch_url}" 2>/dev/null; then
+		if [ "${PACKAGE_ARCH}" = amd64 ] && [ -z "${MANIFEST_URL_CONFIGURED}" ]; then
+			manifest_fetch_url=${MANIFEST_LEGACY_URL}
+			curl -fsS --proto '=https' --max-time "${FETCH_TIMEOUT}" \
+			    -o "${WORK}/envelope.json" "${manifest_fetch_url}" 2>/dev/null || true
+		fi
+	fi
+	if [ -s "${WORK}/envelope.json" ] &&
 	    "${PHP}" -n -r '
 $doc = json_decode(file_get_contents($argv[1]), true);
 if (!is_array($doc) || ($doc["schema_version"] ?? "") !== "freesense.repositories/v3") exit(2);

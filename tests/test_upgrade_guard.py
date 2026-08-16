@@ -61,7 +61,7 @@ class RepositoryOSVersionTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertRegex(upgrade_makefile, r"(?m)^PORTREVISION=\s*8$")
-        self.assertRegex(repoc_makefile, r"(?m)^PORTREVISION=\s*5$")
+        self.assertRegex(repoc_makefile, r"(?m)^PORTREVISION=\s*6$")
 
     def test_running_userland_is_the_legacy_fallback(self) -> None:
         self.assertIn('OSVERSION="$(uname -U 2>/dev/null || true)"', REPO_SETUP)
