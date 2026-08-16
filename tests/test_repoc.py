@@ -26,12 +26,13 @@ FREEBSD_PIN = "9" * 64
 OSVERSION = 1600019
 
 
-def component_url(kind: str, fingerprint: str, train: str = "1.1") -> str:
+def component_url(kind: str, fingerprint: str, train: str = "1.1",
+                  package_arch: str = "amd64") -> str:
     if kind == "system":
-        return f"https://pkg.freesense.org/v1/artifacts/system/{fingerprint}/amd64"
+        return f"https://pkg.freesense.org/v1/artifacts/system/{fingerprint}/{package_arch}"
     return (
         "https://pkg.freesense.org/v1/artifacts/packages/"
-        f"{train}/{fingerprint}/amd64"
+        f"{train}/{fingerprint}/{package_arch}"
     )
 
 
@@ -263,6 +264,8 @@ class RepocSafetyTests(unittest.TestCase):
         installed_version: str = "1.0.0-RELEASE",
         fail_swap: bool = False,
         lock_hold: float = 0,
+        machine_arch: str | None = None,
+        processor_arch: str | None = None,
     ) -> tuple[subprocess.CompletedProcess[str], Path, Path, Path, bytes]:
         case = self.root / name
         case.mkdir()
@@ -347,6 +350,10 @@ exec "$REAL_MV" "$@"
                 "INSTALLED_VERSION": installed_version,
             }
         )
+        if machine_arch is not None:
+            environment["MACHINE_ARCH"] = machine_arch
+        if processor_arch is not None:
+            environment["PROCESSOR_ARCH"] = processor_arch
         command = [self.shell, REPOC]
         if local_only:
             command.append("-l")
@@ -421,6 +428,28 @@ exec "$REAL_MV" "$@"
         self.assertIn(component_url("packages", PACKAGES_SHA), config)
         self.assertTrue((repos / "FreeSense-repo-devel.default").exists())
         self.assertFalse((repos / "FreeSense-repo-existing.conf").exists())
+
+    def test_arm64_payload_uses_only_aarch64_repositories(self) -> None:
+        payload = v3_payload()
+        for channel in payload["channels"].values():
+            channel["architecture"] = "arm64"
+            channel["package_arch"] = "aarch64"
+            channel["abi"] = "FreeBSD:16:aarch64"
+            channel["altabi"] = "freebsd:16:aarch64:64"
+            train = channel["package_train"]
+            channel["system"]["url"] = component_url(
+                "system", channel["system"]["fingerprint"], train, "aarch64"
+            )
+            channel["packages"]["url"] = component_url(
+                "packages", channel["packages"]["fingerprint"], train, "aarch64"
+            )
+        result, repos, _, _, _ = self.run_repoc(
+            "arm64", payload, machine_arch="arm64", processor_arch="aarch64"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        config = (repos / "FreeSense-repo-devel.conf").read_text(encoding="utf-8")
+        self.assertIn("/aarch64", config)
+        self.assertNotIn("/amd64", config)
 
     def test_selected_complete_channel_works_while_default_channel_is_pending(self) -> None:
         live = stable_complete_devel_pending_payload()
