@@ -799,8 +799,7 @@ def main() -> int:
                 state=args.state,
                 initialize_local=False,
             )
-            if changed:
-                activate_cloud_runtime()
+            activate_cloud_runtime()
         except (
             InvalidMetadata,
             ET.ParseError,
