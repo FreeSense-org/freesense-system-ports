@@ -39,7 +39,7 @@ class CloudInitAdapterTests(unittest.TestCase):
     def test_wrapper_uses_ports_selected_python(self):
         makefile = PORT_MAKEFILE.read_text(encoding="utf-8")
         wrapper = WRAPPER_TEMPLATE.read_text(encoding="utf-8")
-        self.assertIn("PORTREVISION=\t12", makefile)
+        self.assertIn("PORTREVISION=\t13", makefile)
         self.assertIn("SUB_FILES=\tfreesense-cloud-init", makefile)
         self.assertIn("SUB_LIST=\tPYTHON_CMD=${PYTHON_CMD}", makefile)
         self.assertIn("${WRKDIR}/freesense-cloud-init", makefile)
@@ -147,11 +147,11 @@ class CloudInitAdapterTests(unittest.TestCase):
 
     def test_final_phase_continues_after_recoverable_cloud_init_error(self):
         runs: list[list[str]] = []
-        statuses = iter((0, 0, 2, 0))
+        statuses = iter((0, 0, 2, 0, 0, 0, 0))
 
         def record(cmd, check=False, **_kwargs):
             runs.append(list(cmd))
-            return mock.Mock(returncode=next(statuses))
+            return mock.Mock(returncode=next(statuses, 0))
 
         with (
             mock.patch.object(CLOUD.subprocess, "run", side_effect=record),
