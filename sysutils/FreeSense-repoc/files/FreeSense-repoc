@@ -159,11 +159,19 @@ function validate_component($component, $kind, $train, $schema, $package_arch) {
     if ($kind === "system") {
         if (array_key_exists("system_fingerprint", $component) &&
             $component["system_fingerprint"] !== "") invalid_payload(15);
+    } elseif ($kind === "mirror") {
+        /* The frozen upstream layer is not built against a System repository
+           and carries no package train, so its URL has neither. */
+        $expected = "https://pkg.freesense.org/v1/artifacts/mirror/" .
+            $fingerprint . "/" . $package_arch;
+        if (array_key_exists("system_fingerprint", $component) &&
+            $component["system_fingerprint"] !== "") invalid_payload(15);
     } else {
         $expected = "https://pkg.freesense.org/v1/artifacts/packages/" .
             $train . "/" . $fingerprint . "/" . $package_arch;
     }
-    if (in_array($schema, ["freesense.channels/v2", "freesense.channels/v3"], true)) {
+    if (in_array($schema, ["freesense.channels/v2", "freesense.channels/v3",
+        "freesense.channels/v4"], true)) {
         $pin = $component["freebsd_pin_id"] ?? null;
         if (!is_string($pin) || !preg_match("/^[0-9a-f]{64}$/D", $pin)) invalid_payload(17);
         if ($kind === "packages") {
@@ -191,7 +199,8 @@ function validate_document($filename, $installed, $machine_arch, $package_arch, 
     $doc = json_decode($raw, true);
     $schema = $doc["schema_version"] ?? null;
     if (!is_array($doc) || json_last_error() !== JSON_ERROR_NONE ||
-        !in_array($schema, ["freesense.channels/v1", "freesense.channels/v2", "freesense.channels/v3"], true) ||
+        !in_array($schema, ["freesense.channels/v1", "freesense.channels/v2",
+            "freesense.channels/v3", "freesense.channels/v4"], true) ||
         !is_array($doc["channels"] ?? null) || count($doc["channels"]) === 0) {
         invalid_payload(21);
     }
@@ -217,7 +226,7 @@ function validate_document($filename, $installed, $machine_arch, $package_arch, 
         if (!safe_text($description) || !is_string($train) ||
             !preg_match("/^[0-9]+[.][0-9]+$/D", $train) ||
             !is_bool($default)) invalid_payload(23);
-        if ($schema === "freesense.channels/v3") {
+        if (in_array($schema, ["freesense.channels/v3", "freesense.channels/v4"], true)) {
             [$version_major, $version_minor, $_version_patch] = version_parts($version);
             if ($train !== $version_major . "." . $version_minor) invalid_payload(29);
         } else {
@@ -230,6 +239,7 @@ function validate_document($filename, $installed, $machine_arch, $package_arch, 
             $abi_parts[1] !== $altabi_parts[1]) invalid_payload(24);
         $system = validate_component($channel["system"] ?? null, "system", $train, $schema, $package_arch);
         $packages = validate_component($channel["packages"] ?? null, "packages", $train, $schema, $package_arch);
+        $mirror = validate_component($channel["mirror"] ?? null, "mirror", $train, $schema, $package_arch);
         $osversion = $system["osversion"] ?? null;
         if ($osversion !== null && (
             !is_int($osversion) ||
@@ -242,8 +252,16 @@ function validate_document($filename, $installed, $machine_arch, $package_arch, 
             if (!is_string($binding) ||
                 !preg_match("/^[0-9a-f]{64}$/D", $binding) ||
                 $binding !== $system["fingerprint"]) invalid_payload(26);
-            if (in_array($schema, ["freesense.channels/v2", "freesense.channels/v3"], true) &&
+            if (in_array($schema, ["freesense.channels/v2", "freesense.channels/v3",
+                "freesense.channels/v4"], true) &&
                 $packages["freebsd_pin_id"] !== $system["freebsd_pin_id"]) invalid_payload(28);
+        }
+        if ($mirror !== null) {
+            /* The frozen upstream layer only means anything alongside the
+               System repository it was pinned with. */
+            if ($system === null ||
+                $mirror["freebsd_pin_id"] !== $system["freebsd_pin_id"]) invalid_payload(37);
+            if ($mirror["verified"] !== true) invalid_payload(38);
         }
         if ($default) {
             $defaults++;
@@ -251,7 +269,8 @@ function validate_document($filename, $installed, $machine_arch, $package_arch, 
         }
         $complete[$key] = $system !== null && $packages !== null &&
             $system["verified"] === true && $packages["verified"] === true;
-        $eligible[$key] = $schema !== "freesense.channels/v3" || channel_is_eligible($version, $installed);
+        $eligible[$key] = !in_array($schema, ["freesense.channels/v3", "freesense.channels/v4"], true)
+            || channel_is_eligible($version, $installed);
         if ($complete[$key] && $eligible[$key]) {
             $rows[] = implode("|", [
                 $key,
@@ -264,6 +283,7 @@ function validate_document($filename, $installed, $machine_arch, $package_arch, 
                 $altabi,
                 $osversion === null ? "" : (string)$osversion,
                 $default ? "yes" : "no",
+                $mirror === null ? "" : $mirror["url"],
             ]);
         }
     }
@@ -271,7 +291,9 @@ function validate_document($filename, $installed, $machine_arch, $package_arch, 
     return [$doc, $rows, $complete, $eligible, $default_name];
 }
 function reject_generation_rollback($new_channel, $old_channel, $new_schema) {
-    foreach (["system", "packages"] as $kind) {
+    foreach (["system", "packages", "mirror"] as $kind) {
+        /* The mirror is optional until every published channel carries one. */
+        if (!isset($old_channel[$kind]) || !isset($new_channel[$kind])) continue;
         $old = $old_channel[$kind];
         $new = $new_channel[$kind];
         if ($new["generation"] < $old["generation"]) invalid_payload(31);
@@ -279,7 +301,8 @@ function reject_generation_rollback($new_channel, $old_channel, $new_schema) {
             $new["fingerprint"] !== $old["fingerprint"]) invalid_payload(32);
         $binding_changed = $new_schema === "freesense.channels/v1" &&
             ($new["system_fingerprint"] ?? "") !== ($old["system_fingerprint"] ?? "");
-        $pin_changed = in_array($new_schema, ["freesense.channels/v2", "freesense.channels/v3"], true) && (
+        $pin_changed = in_array($new_schema, ["freesense.channels/v2", "freesense.channels/v3",
+            "freesense.channels/v4"], true) && (
             ($new["freebsd_pin_id"] ?? "") !== ($old["freebsd_pin_id"] ?? "") ||
             ($new["built_against_system"] ?? "") !== ($old["built_against_system"] ?? "")
         );
@@ -304,8 +327,8 @@ if (($eligible[$selected] ?? true) === false) $selected = $default_name;
 if (!isset($complete[$selected]) || !$complete[$selected] || !($eligible[$selected] ?? false)) invalid_payload(50);
 if ($argv[3] !== "" && file_exists($argv[3])) {
     [$baseline, $_, $baseline_complete, $_baseline_eligible, $_default] = validate_document($argv[3], $argv[5], $argv[6], $argv[7], $argv[8], $argv[9]);
-    if ($candidate["schema_version"] === "freesense.channels/v3" &&
-        $baseline["schema_version"] === "freesense.channels/v3") {
+    if (in_array($candidate["schema_version"], ["freesense.channels/v3", "freesense.channels/v4"], true) &&
+        in_array($baseline["schema_version"], ["freesense.channels/v3", "freesense.channels/v4"], true)) {
         foreach ($candidate["channels"] as $name => $channel) {
             if (isset($baseline["channels"][$name]) &&
                 version_compare($channel["version"], $baseline["channels"][$name]["version"], "<")) invalid_payload(36);
@@ -381,7 +404,7 @@ if [ -z "${NOFETCH}" ] && command -v curl >/dev/null 2>&1 && [ -r "${CHANNEL_KEY
 	if [ -s "${WORK}/envelope.json" ] &&
 	    "${PHP}" -n -r '
 $doc = json_decode(file_get_contents($argv[1]), true);
-if (!is_array($doc) || ($doc["schema_version"] ?? "") !== "freesense.repositories/v3") exit(2);
+if (!is_array($doc) || !in_array($doc["schema_version"] ?? "", ["freesense.repositories/v3", "freesense.repositories/v4"], true)) exit(2);
 $payload = base64_decode($doc["payload"] ?? "", true);
 $signature = base64_decode($doc["signature"] ?? "", true);
 if ($payload === false || $signature === false || $payload === "" || $signature === "") exit(3);
@@ -441,7 +464,7 @@ STAGED_REPOS="$(mktemp -d "${repos_parent}/.${repos_name}.new.XXXXXX")"
 
 COUNT=0
 DEFAULT_NAME=""
-while IFS='|' read -r name description version system_url packages_url train abi altabi osversion default; do
+while IFS='|' read -r name description version system_url packages_url train abi altabi osversion default mirror_url; do
 	[ -n "${name}" ] || continue
 	base="${STAGED_REPOS}/${PRODUCT}-repo-${name}"
 	cat >"${base}.conf" <<EOF
@@ -466,6 +489,22 @@ ${PRODUCT}-packages: {
   enabled: yes
 }
 EOF
+	# The frozen upstream layer sits underneath both FreeSense repositories, so
+	# a package FreeSense builds always wins over the stock one of the same
+	# name. Channels published before the mirror existed simply omit it.
+	if [ -n "${mirror_url}" ]; then
+		cat >>"${base}.conf" <<EOF
+
+${PRODUCT}-mirror: {
+  url: "${mirror_url}",
+  mirror_type: "none",
+  signature_type: "fingerprints",
+  fingerprints: "/usr/local/share/${PRODUCT}/keys/mirror",
+  priority: 10,
+  enabled: yes
+}
+EOF
+	fi
 	printf '%s' "${name}" >"${base}.name"
 	printf '%s\n' "${description}" >"${base}.descr"
 	printf '%s\n' "${version}" >"${base}.version"

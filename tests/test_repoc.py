@@ -22,6 +22,7 @@ SYSTEM_SHA = "a" * 64
 PACKAGES_SHA = "b" * 64
 STABLE_SYSTEM_SHA = "c" * 64
 STABLE_PACKAGES_SHA = "d" * 64
+MIRROR_SHA = "e" * 64
 FREEBSD_PIN = "9" * 64
 OSVERSION = 1600019
 
@@ -30,6 +31,8 @@ def component_url(kind: str, fingerprint: str, train: str = "1.1",
                   package_arch: str = "amd64") -> str:
     if kind == "system":
         return f"https://pkg.freesense.org/v1/artifacts/system/{fingerprint}/{package_arch}"
+    if kind == "mirror":
+        return f"https://pkg.freesense.org/v1/artifacts/mirror/{fingerprint}/{package_arch}"
     return (
         "https://pkg.freesense.org/v1/artifacts/packages/"
         f"{train}/{fingerprint}/{package_arch}"
@@ -144,6 +147,24 @@ def stable_complete_devel_pending_payload() -> dict[str, object]:
             ),
         },
     }
+
+
+def v4_payload(mirror: bool = True, mirror_sha: str = MIRROR_SHA,
+               pin: str = FREEBSD_PIN) -> dict[str, object]:
+    """A v4 document, with the frozen upstream layer present unless suppressed."""
+    payload = v3_payload()
+    payload["schema_version"] = "freesense.channels/v4"
+    if mirror:
+        for channel in payload["channels"].values():
+            channel["mirror"] = {
+                "fingerprint": mirror_sha,
+                "url": component_url("mirror", mirror_sha),
+                "generation": 3,
+                "published_at": "2026-07-22T08:00:00Z",
+                "verified": True,
+                "freebsd_pin_id": pin,
+            }
+    return payload
 
 
 def payload_bytes(payload: dict[str, object]) -> bytes:
@@ -428,6 +449,60 @@ exec "$REAL_MV" "$@"
         self.assertIn(component_url("packages", PACKAGES_SHA), config)
         self.assertTrue((repos / "FreeSense-repo-devel.default").exists())
         self.assertFalse((repos / "FreeSense-repo-existing.conf").exists())
+
+    def test_v4_layers_the_frozen_mirror_under_both_freesense_repositories(self) -> None:
+        result, repos, _cache, _local, _ = self.run_repoc("v4-mirror", v4_payload())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        config = (repos / "FreeSense-repo-devel.conf").read_text(encoding="utf-8")
+        self.assertIn(component_url("mirror", MIRROR_SHA), config)
+        self.assertIn("FreeSense-mirror: {", config)
+        self.assertIn('fingerprints: "/usr/local/share/FreeSense/keys/mirror"', config)
+        # FreeSense's own builds must outrank the stock packages underneath them.
+        priorities = [int(line.split(":")[1].strip().rstrip(","))
+                      for line in config.splitlines() if line.strip().startswith("priority:")]
+        self.assertEqual(priorities, [100, 50, 10])
+        # Upstream's own repository stays disabled; the mirror is ours, pinned.
+        self.assertIn("FreeBSD: { enabled: no }", config)
+
+    def test_v4_without_a_mirror_configures_exactly_what_v3_does(self) -> None:
+        result, repos, _cache, _local, _ = self.run_repoc("v4-bare", v4_payload(mirror=False))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        config = (repos / "FreeSense-repo-devel.conf").read_text(encoding="utf-8")
+        self.assertNotIn("FreeSense-mirror", config)
+        self.assertIn(component_url("system", SYSTEM_SHA), config)
+        self.assertIn(component_url("packages", PACKAGES_SHA), config)
+
+    def test_v3_configuration_is_unchanged_by_mirror_support(self) -> None:
+        result, repos, _cache, _local, _ = self.run_repoc("v3-regression", v3_payload())
+        self.assertEqual(result.returncode, 0, result.stderr)
+        config = (repos / "FreeSense-repo-devel.conf").read_text(encoding="utf-8")
+        self.assertNotIn("FreeSense-mirror", config)
+        self.assertIn(component_url("system", SYSTEM_SHA), config)
+
+    def test_a_mirror_pinned_to_another_snapshot_changes_nothing(self) -> None:
+        # A mirror from a different FreeBSD pin would serve packages the System
+        # repository was never built against.
+        payload = v4_payload(pin="7" * 64)
+        result, repos, _cache, _local, _ = self.run_repoc("v4-foreign-pin", payload)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((repos / "FreeSense-repo-devel.conf").exists())
+        self.assertTrue((repos / "FreeSense-repo-existing.conf").exists())
+
+    def test_an_unverified_mirror_changes_nothing(self) -> None:
+        payload = v4_payload()
+        for channel in payload["channels"].values():
+            channel["mirror"]["verified"] = False
+        result, repos, _cache, _local, _ = self.run_repoc("v4-unverified", payload)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((repos / "FreeSense-repo-devel.conf").exists())
+
+    def test_a_mirror_url_shaped_like_another_component_changes_nothing(self) -> None:
+        payload = v4_payload()
+        for channel in payload["channels"].values():
+            channel["mirror"]["url"] = component_url("packages", MIRROR_SHA)
+        result, repos, _cache, _local, _ = self.run_repoc("v4-wrong-url", payload)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((repos / "FreeSense-repo-devel.conf").exists())
 
     def test_arm64_payload_uses_only_aarch64_repositories(self) -> None:
         payload = v3_payload()
