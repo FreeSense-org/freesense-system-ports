@@ -72,6 +72,36 @@ function createSlug($string) {
 
 }
 
+/*
+ * Build the saved view string from the submitted form. Each value is later
+ * parsed back and used in the page, so only accept plain tokens
+ * (pfSense-SA-26_09).
+ */
+function status_monitoring_category_from_post() {
+	$fields = [
+		'left' => 'graph-left',
+		'right' => 'graph-right',
+		'timePeriod' => 'time-period',
+		'resolution' => 'resolution',
+		'startDate' => 'start-date',
+		'endDate' => 'end-date',
+		'startTime' => 'start-time',
+		'endTime' => 'end-time',
+		'graphtype' => 'graph-type',
+		'invert' => 'invert',
+		'refresh-interval' => 'refresh-interval',
+	];
+	$parts = [];
+	foreach ($fields as $name => $post_name) {
+		$value = (string)($_POST[$post_name] ?? '');
+		if (!preg_match('/^[A-Za-z0-9_.:\/+ -]*$/', $value)) {
+			$value = '';
+		}
+		$parts[] = "{$name}={$value}";
+	}
+	return implode('&', $parts);
+}
+
 if(!empty($_POST['view-title'])) {
 	$view_title = createSlug($_POST['view-title']);
 } else {
@@ -125,16 +155,16 @@ if ($_POST['save-view']) {
 
 	if (!empty(config_get_path('rrd/savedviews', []))) {
 		if($title == "default") {
-			config_set_path('rrd/category', "left=".$_POST['graph-left']."&right=".$_POST['graph-right']."&timePeriod=".$_POST['time-period']."&resolution=".$_POST['resolution']."&startDate=".$_POST['start-date']."&endDate=".$_POST['end-date']."&startTime=".$_POST['start-time']."&endTime=".$_POST['end-time']."&graphtype=".$_POST['graph-type']."&invert=".$_POST['invert']."&refresh-interval=".$_POST['refresh-interval']);
+			config_set_path('rrd/category', status_monitoring_category_from_post());
 		} else {
 			foreach (config_get_path('rrd/savedviews', []) as $key => $view) {
 				if($title == createSlug($view['title'])) {
-					config_set_path("rrd/savedviews/{$key}/category", "left=".$_POST['graph-left']."&right=".$_POST['graph-right']."&timePeriod=".$_POST['time-period']."&resolution=".$_POST['resolution']."&startDate=".$_POST['start-date']."&endDate=".$_POST['end-date']."&startTime=".$_POST['start-time']."&endTime=".$_POST['end-time']."&graphtype=".$_POST['graph-type']."&invert=".$_POST['invert']."&refresh-interval=".$_POST['refresh-interval']);
+					config_set_path("rrd/savedviews/{$key}/category", status_monitoring_category_from_post());
 				}
 			}
 		}
 	} else {
-		config_set_path('rrd/category', "left=".$_POST['graph-left']."&right=".$_POST['graph-right']."&timePeriod=".$_POST['time-period']."&resolution=".$_POST['resolution']."&startDate=".$_POST['start-date']."&endDate=".$_POST['end-date']."&startTime=".$_POST['start-time']."&endTime=".$_POST['end-time']."&graphtype=".$_POST['graph-type']."&invert=".$_POST['invert']."&refresh-interval=".$_POST['refresh-interval']);
+		config_set_path('rrd/category', status_monitoring_category_from_post());
 	}
 
 	write_config(gettext("Status Monitoring View Updated"));
@@ -144,7 +174,7 @@ if ($_POST['save-view']) {
 //add a new view and make sure the string isn't empty
 if ($_POST['add-view'] && !empty($view_title) && strtolower($view_title) != "default") {
 	$title = $view_title;
-	$values = "left=".$_POST['graph-left']."&right=".$_POST['graph-right']."&timePeriod=".$_POST['time-period']."&resolution=".$_POST['resolution']."&startDate=".$_POST['start-date']."&endDate=".$_POST['end-date']."&startTime=".$_POST['start-time']."&endTime=".$_POST['end-time']."&graphtype=".$_POST['graph-type']."&invert=".$_POST['invert']."&refresh-interval=".$_POST['refresh-interval'];
+	$values = status_monitoring_category_from_post();
 	$key = "view" . count(config_get_path('rrd/savedviews', []));
 	config_set_path("rrd/savedviews/{$key}", ['title' => $title, 'category' => $values]);
 	write_config(gettext("Status Monitoring View Added"));
@@ -1087,7 +1117,7 @@ events.push(function() {
 
 	}
 
-	applySettings("<?php echo $pconfig['category']; ?>");
+	applySettings(<?=json_encode((string)$pconfig['category'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)?>);
 
 	$( "#add-view" ).click(function() {
 
