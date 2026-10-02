@@ -82,7 +82,9 @@ LIB_DEPENDS=	libltdl.so:devel/libltdl
 
 USES=		php:flavors
 
-IGNORE_WITH_PHP=	72 73 74 80 81 82 83 84
+# Only PHP 8.5 (DEFAULT_VERSIONS php=8.5) is supported. List every other
+# version Mk/Uses/php.mk offers so no other flavor can be selected.
+IGNORE_WITH_PHP=	82 83 84 86
 USE_PHP=	bz2 bcmath ctype curl dom filter gettext gmp intl json mbstring \
 		mcrypt opcache openssl pcntl pdo pdo_sqlite posix \
 		radius readline session shmop simplexml sockets sysvmsg sysvsem \

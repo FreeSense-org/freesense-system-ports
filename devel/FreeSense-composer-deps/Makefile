@@ -1,6 +1,5 @@
 PORTNAME=	FreeSense-composer-deps
-DISTVERSION=	0.5
-PORTREVISION=	2
+DISTVERSION=	0.6
 CATEGORIES=	devel
 
 MAINTAINER=	dev@freesense.org
@@ -11,11 +10,11 @@ VENDORBASE=	/FreeSense/include/vendor
 
 NO_BUILD=	yes
 SHCMD_VER=		1.7.0
-UTILS_VER=		v4.1.1
+UTILS_VER=		v4.1.5
 SIMPLECACHE_VER=	3.0.0
 SIMPLEPIE_VER=		1.9.0
-CACHE_VER=		v8.0.5
-CONSOLE_VER=		v8.0.4
+CACHE_VER=		v8.1.8
+CONSOLE_VER=		v8.1.8
 
 USE_GITHUB=	nodefault
 
@@ -31,15 +30,17 @@ GH_TUPLE=	mikehaertl:php-shellcommand:${SHCMD_VER}:shellcommand \
 PSR_CACHE_VER=	3.0.0
 PSR_CONTA_VER=	2.0.2
 PSR_LOG_VER=	3.0.2
-SYM_CACHE_VER=	v3.6.0
-SYM_DEPRE_VER=	v3.6.0
-SYM_CTYPE_VER=	v1.33.0
-SYM_IGRAP_VER=	v1.33.0
-SYM_INORM_VER=	v1.33.0
-SYM_MBSTR_VER=	v1.31.0
-SYM_SERV_VER=	v3.6.1
-SYM_STR_VER=	v8.0.4
-SYM_VAR_VER=	v8.0.0
+SYM_CACHE_VER=	v3.7.1
+SYM_DEPRE_VER=	v3.7.1
+SYM_CTYPE_VER=	v1.37.0
+SYM_IGRAP_VER=	v1.43.0
+SYM_INORM_VER=	v1.43.0
+SYM_MBSTR_VER=	v1.43.0
+SYM_DEEPC_VER=	v1.43.0
+SYM_P85_VER=	v1.43.0
+SYM_SERV_VER=	v3.7.3
+SYM_STR_VER=	v8.1.7
+SYM_VAR_VER=	v8.1.6
 GH_TUPLE+=	php-fig:cache:${PSR_CACHE_VER}:psrcache \
 		php-fig:container:${PSR_CONTA_VER}:psrcontainer \
 		php-fig:log:${PSR_LOG_VER}:psrlog \
@@ -49,6 +50,8 @@ GH_TUPLE+=	php-fig:cache:${PSR_CACHE_VER}:psrcache \
 		symfony:polyfill-intl-grapheme:${SYM_IGRAP_VER}:polyfillgrapheme \
 		symfony:polyfill-intl-normalizer:${SYM_INORM_VER}:polyfillintlnormalizer \
 		symfony:polyfill-mbstring:${SYM_MBSTR_VER}:polyfillmbstring \
+		symfony:polyfill-deepclone:${SYM_DEEPC_VER}:polyfilldeepclone \
+		symfony:polyfill-php85:${SYM_P85_VER}:polyfillphp85 \
 		symfony:service-contracts:${SYM_SERV_VER}:servicecontracts \
 		symfony:string:${SYM_STR_VER}:string \
 		symfony:var-exporter:${SYM_VAR_VER}:varexporter
@@ -76,6 +79,8 @@ do-install:
 	(cd ${WRKDIR}/polyfill-intl-grapheme-${SYM_IGRAP_VER:C/v//} && ${COPYTREE_SHARE} . ${STAGEDIR}${PREFIX}${VENDORBASE}/symfony/polyfill-intl-grapheme)
 	(cd ${WRKDIR}/polyfill-intl-normalizer-${SYM_INORM_VER:C/v//} && ${COPYTREE_SHARE} . ${STAGEDIR}${PREFIX}${VENDORBASE}/symfony/polyfill-intl-normalizer)
 	(cd ${WRKDIR}/polyfill-mbstring-${SYM_MBSTR_VER:C/v//} && ${COPYTREE_SHARE} . ${STAGEDIR}${PREFIX}${VENDORBASE}/symfony/polyfill-mbstring)
+	(cd ${WRKDIR}/polyfill-deepclone-${SYM_DEEPC_VER:C/v//} && ${COPYTREE_SHARE} . ${STAGEDIR}${PREFIX}${VENDORBASE}/symfony/polyfill-deepclone)
+	(cd ${WRKDIR}/polyfill-php85-${SYM_P85_VER:C/v//} && ${COPYTREE_SHARE} . ${STAGEDIR}${PREFIX}${VENDORBASE}/symfony/polyfill-php85)
 	(cd ${WRKDIR}/service-contracts-${SYM_SERV_VER:C/v//} && ${COPYTREE_SHARE} . ${STAGEDIR}${PREFIX}${VENDORBASE}/symfony/service-contracts)
 	(cd ${WRKDIR}/string-${SYM_STR_VER:C/v//} && ${COPYTREE_SHARE} . ${STAGEDIR}${PREFIX}${VENDORBASE}/symfony/string)
 	(cd ${WRKDIR}/var-exporter-${SYM_VAR_VER:C/v//} && ${COPYTREE_SHARE} . ${STAGEDIR}${PREFIX}${VENDORBASE}/symfony/var-exporter)
