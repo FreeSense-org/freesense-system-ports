@@ -18,7 +18,9 @@ OPTIONS_DEFAULT=ETHERSWITCH PF_CAPTIVEPORTAL
 ETHERSWITCH_DESC=	Enable etherswitch functions
 
 USES=		php:ext
-IGNORE_WITH_PHP=56 70 71 74 80 81 82 83 84
+# Only PHP 8.5 (DEFAULT_VERSIONS php=8.5) is supported. List every other
+# version Mk/Uses/php.mk offers so no other flavor can be selected.
+IGNORE_WITH_PHP=	82 83 84 86
 
 CFLAGS+=	-I/usr/local/include -I. -DTCPSTATES
 CFLAGS+=	-DPHP_FREESENSE_VERSION='\"${PORTVERSION}\"'

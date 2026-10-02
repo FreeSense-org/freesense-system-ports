@@ -14,7 +14,9 @@ LICENSE=	APACHE20
 
 RUN_DEPENDS+=	${PECL_PKGNAMEPREFIX}rrd>=2.0.0:databases/pecl-rrd@${PHP_FLAVOR}
 
-IGNORE_WITH_PHP=	56 70 71 74 81 82 83 84
+# Only PHP 8.5 (DEFAULT_VERSIONS php=8.5) is supported. List every other
+# version Mk/Uses/php.mk offers so no other flavor can be selected.
+IGNORE_WITH_PHP=	82 83 84 86
 USES=		php:flavors
 
 NO_BUILD=	yes
