@@ -32,6 +32,7 @@ FreeSense/include/vendor/nette/utils/src/Utils/ArrayList.php
 FreeSense/include/vendor/nette/utils/src/Utils/Arrays.php
 FreeSense/include/vendor/nette/utils/src/Utils/Callback.php
 FreeSense/include/vendor/nette/utils/src/Utils/DateTime.php
+FreeSense/include/vendor/nette/utils/src/Utils/DateTimeImmutable.php
 FreeSense/include/vendor/nette/utils/src/Utils/FileInfo.php
 FreeSense/include/vendor/nette/utils/src/Utils/FileSystem.php
 FreeSense/include/vendor/nette/utils/src/Utils/Finder.php
@@ -45,6 +46,7 @@ FreeSense/include/vendor/nette/utils/src/Utils/Iterables.php
 FreeSense/include/vendor/nette/utils/src/Utils/Json.php
 FreeSense/include/vendor/nette/utils/src/Utils/ObjectHelpers.php
 FreeSense/include/vendor/nette/utils/src/Utils/Paginator.php
+FreeSense/include/vendor/nette/utils/src/Utils/Process.php
 FreeSense/include/vendor/nette/utils/src/Utils/Random.php
 FreeSense/include/vendor/nette/utils/src/Utils/Reflection.php
 FreeSense/include/vendor/nette/utils/src/Utils/ReflectionMethod.php
@@ -254,7 +256,14 @@ FreeSense/include/vendor/symfony/cache/Traits/RedisProxy.php
 FreeSense/include/vendor/symfony/cache/Traits/RedisProxyTrait.php
 FreeSense/include/vendor/symfony/cache/Traits/RedisTrait.php
 FreeSense/include/vendor/symfony/cache/Traits/Relay/Relay20Trait.php
+FreeSense/include/vendor/symfony/cache/Traits/Relay/Relay21Trait.php
+FreeSense/include/vendor/symfony/cache/Traits/Relay/Relay22Trait.php
+FreeSense/include/vendor/symfony/cache/Traits/Relay/Relay30Trait.php
+FreeSense/include/vendor/symfony/cache/Traits/Relay/Relay40Trait.php
 FreeSense/include/vendor/symfony/cache/Traits/Relay/RelayCluster20Trait.php
+FreeSense/include/vendor/symfony/cache/Traits/Relay/RelayCluster21Trait.php
+FreeSense/include/vendor/symfony/cache/Traits/Relay/RelayCluster30Trait.php
+FreeSense/include/vendor/symfony/cache/Traits/Relay/RelayCluster40Trait.php
 FreeSense/include/vendor/symfony/cache/Traits/RelayClusterProxy.php
 FreeSense/include/vendor/symfony/cache/Traits/RelayProxy.php
 FreeSense/include/vendor/symfony/cache/Traits/ValueWrapper.php
@@ -415,6 +424,7 @@ FreeSense/include/vendor/symfony/polyfill-intl-grapheme/LICENSE
 FreeSense/include/vendor/symfony/polyfill-intl-grapheme/README.md
 FreeSense/include/vendor/symfony/polyfill-intl-grapheme/bootstrap.php
 FreeSense/include/vendor/symfony/polyfill-intl-grapheme/bootstrap80.php
+FreeSense/include/vendor/symfony/polyfill-intl-grapheme/bootstrap85.php
 FreeSense/include/vendor/symfony/polyfill-intl-grapheme/composer.json
 FreeSense/include/vendor/symfony/polyfill-intl-normalizer/LICENSE
 FreeSense/include/vendor/symfony/polyfill-intl-normalizer/Normalizer.php
@@ -424,6 +434,8 @@ FreeSense/include/vendor/symfony/polyfill-intl-normalizer/Resources/unidata/cano
 FreeSense/include/vendor/symfony/polyfill-intl-normalizer/Resources/unidata/canonicalDecomposition.php
 FreeSense/include/vendor/symfony/polyfill-intl-normalizer/Resources/unidata/combiningClass.php
 FreeSense/include/vendor/symfony/polyfill-intl-normalizer/Resources/unidata/compatibilityDecomposition.php
+FreeSense/include/vendor/symfony/polyfill-intl-normalizer/Resources/unidata/rawCanonicalDecomposition.php
+FreeSense/include/vendor/symfony/polyfill-intl-normalizer/Resources/unidata/rawCompatibilityDecomposition.php
 FreeSense/include/vendor/symfony/polyfill-intl-normalizer/bootstrap.php
 FreeSense/include/vendor/symfony/polyfill-intl-normalizer/bootstrap80.php
 FreeSense/include/vendor/symfony/polyfill-intl-normalizer/composer.json
@@ -435,11 +447,14 @@ FreeSense/include/vendor/symfony/polyfill-mbstring/Resources/unidata/lowerCase.p
 FreeSense/include/vendor/symfony/polyfill-mbstring/Resources/unidata/titleCaseRegexp.php
 FreeSense/include/vendor/symfony/polyfill-mbstring/Resources/unidata/upperCase.php
 FreeSense/include/vendor/symfony/polyfill-mbstring/bootstrap.php
+FreeSense/include/vendor/symfony/polyfill-mbstring/bootstrap72.php
 FreeSense/include/vendor/symfony/polyfill-mbstring/bootstrap80.php
 FreeSense/include/vendor/symfony/polyfill-mbstring/composer.json
 FreeSense/include/vendor/symfony/service-contracts/Attribute/Required.php
 FreeSense/include/vendor/symfony/service-contracts/Attribute/SubscribedService.php
 FreeSense/include/vendor/symfony/service-contracts/CHANGELOG.md
+FreeSense/include/vendor/symfony/service-contracts/ContainerAwareInterface.php
+FreeSense/include/vendor/symfony/service-contracts/ContainerProviderInterface.php
 FreeSense/include/vendor/symfony/service-contracts/LICENSE
 FreeSense/include/vendor/symfony/service-contracts/README.md
 FreeSense/include/vendor/symfony/service-contracts/ResetInterface.php

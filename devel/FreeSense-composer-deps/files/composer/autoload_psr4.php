@@ -6,7 +6,6 @@ $vendorDir = dirname(__DIR__);
 $baseDir = dirname(dirname(dirname(dirname(dirname(dirname($vendorDir))))));
 
 return array(
-    'FreeSense\\' => array('//usr/local/FreeSense/include'),
     'mikehaertl\\shellcommand\\' => array($vendorDir . '/mikehaertl/php-shellcommand/src'),
     'Tools\\Rector\\Tests\\' => array($baseDir . '/tools/rector/tests'),
     'Tools\\Rector\\' => array($baseDir . '/tools/rector/src'),
@@ -27,4 +26,5 @@ return array(
     'Psr\\Cache\\' => array($vendorDir . '/psr/cache/src'),
     'Nette\\' => array($vendorDir . '/nette/utils/src'),
     'Netgate\\' => array('//usr/local/FreeSense/include/Netgate'),
+    'FreeSense\\' => array('//usr/local/FreeSense/include'),
 );

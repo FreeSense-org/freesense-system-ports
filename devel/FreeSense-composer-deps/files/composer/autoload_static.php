@@ -4,7 +4,7 @@
 
 namespace Composer\Autoload;
 
-class ComposerStaticInitc79a7dac55f2962b16f0419d5f63472d
+class ComposerStaticInitdec2159f616b8728af1a30beb9727558
 {
     public static $files = array (
         '6e3fae29631ef280660b3cdad06f25a8' => __DIR__ . '/..' . '/symfony/deprecation-contracts/function.php',
@@ -16,10 +16,6 @@ class ComposerStaticInitc79a7dac55f2962b16f0419d5f63472d
     );
 
     public static $prefixLengthsPsr4 = array (
-        'F' =>
-        array (
-            'FreeSense\\' => 10,
-        ),
         'm' =>
         array (
             'mikehaertl\\shellcommand\\' => 24,
@@ -55,13 +51,13 @@ class ComposerStaticInitc79a7dac55f2962b16f0419d5f63472d
             'Nette\\' => 6,
             'Netgate\\' => 8,
         ),
+        'F' =>
+        array (
+            'FreeSense\\' => 10,
+        ),
     );
 
     public static $prefixDirsPsr4 = array (
-        'FreeSense\\' =>
-        array (
-            0 => '//usr/local/FreeSense/include',
-        ),
         'mikehaertl\\shellcommand\\' =>
         array (
             0 => __DIR__ . '/..' . '/mikehaertl/php-shellcommand/src',
@@ -142,6 +138,10 @@ class ComposerStaticInitc79a7dac55f2962b16f0419d5f63472d
         array (
             0 => '//usr/local/FreeSense/include/Netgate',
         ),
+        'FreeSense\\' =>
+        array (
+            0 => '//usr/local/FreeSense/include',
+        ),
     );
 
     public static $prefixesPsr0 = array (
@@ -182,6 +182,7 @@ class ComposerStaticInitc79a7dac55f2962b16f0419d5f63472d
         'Nette\\Utils\\AssertionException' => __DIR__ . '/..' . '/nette/utils/src/Utils/exceptions.php',
         'Nette\\Utils\\Callback' => __DIR__ . '/..' . '/nette/utils/src/Utils/Callback.php',
         'Nette\\Utils\\DateTime' => __DIR__ . '/..' . '/nette/utils/src/Utils/DateTime.php',
+        'Nette\\Utils\\DateTimeImmutable' => __DIR__ . '/..' . '/nette/utils/src/Utils/DateTimeImmutable.php',
         'Nette\\Utils\\FileInfo' => __DIR__ . '/..' . '/nette/utils/src/Utils/FileInfo.php',
         'Nette\\Utils\\FileSystem' => __DIR__ . '/..' . '/nette/utils/src/Utils/FileSystem.php',
         'Nette\\Utils\\Finder' => __DIR__ . '/..' . '/nette/utils/src/Utils/Finder.php',
@@ -198,6 +199,9 @@ class ComposerStaticInitc79a7dac55f2962b16f0419d5f63472d
         'Nette\\Utils\\JsonException' => __DIR__ . '/..' . '/nette/utils/src/Utils/exceptions.php',
         'Nette\\Utils\\ObjectHelpers' => __DIR__ . '/..' . '/nette/utils/src/Utils/ObjectHelpers.php',
         'Nette\\Utils\\Paginator' => __DIR__ . '/..' . '/nette/utils/src/Utils/Paginator.php',
+        'Nette\\Utils\\Process' => __DIR__ . '/..' . '/nette/utils/src/Utils/Process.php',
+        'Nette\\Utils\\ProcessFailedException' => __DIR__ . '/..' . '/nette/utils/src/Utils/exceptions.php',
+        'Nette\\Utils\\ProcessTimeoutException' => __DIR__ . '/..' . '/nette/utils/src/Utils/exceptions.php',
         'Nette\\Utils\\Random' => __DIR__ . '/..' . '/nette/utils/src/Utils/Random.php',
         'Nette\\Utils\\Reflection' => __DIR__ . '/..' . '/nette/utils/src/Utils/Reflection.php',
         'Nette\\Utils\\ReflectionMethod' => __DIR__ . '/..' . '/nette/utils/src/Utils/ReflectionMethod.php',
@@ -370,7 +374,14 @@ class ComposerStaticInitc79a7dac55f2962b16f0419d5f63472d
         'Symfony\\Component\\Cache\\Traits\\RelayClusterProxy' => __DIR__ . '/..' . '/symfony/cache/Traits/RelayClusterProxy.php',
         'Symfony\\Component\\Cache\\Traits\\RelayProxy' => __DIR__ . '/..' . '/symfony/cache/Traits/RelayProxy.php',
         'Symfony\\Component\\Cache\\Traits\\Relay\\Relay20Trait' => __DIR__ . '/..' . '/symfony/cache/Traits/Relay/Relay20Trait.php',
+        'Symfony\\Component\\Cache\\Traits\\Relay\\Relay21Trait' => __DIR__ . '/..' . '/symfony/cache/Traits/Relay/Relay21Trait.php',
+        'Symfony\\Component\\Cache\\Traits\\Relay\\Relay22Trait' => __DIR__ . '/..' . '/symfony/cache/Traits/Relay/Relay22Trait.php',
+        'Symfony\\Component\\Cache\\Traits\\Relay\\Relay30Trait' => __DIR__ . '/..' . '/symfony/cache/Traits/Relay/Relay30Trait.php',
+        'Symfony\\Component\\Cache\\Traits\\Relay\\Relay40Trait' => __DIR__ . '/..' . '/symfony/cache/Traits/Relay/Relay40Trait.php',
         'Symfony\\Component\\Cache\\Traits\\Relay\\RelayCluster20Trait' => __DIR__ . '/..' . '/symfony/cache/Traits/Relay/RelayCluster20Trait.php',
+        'Symfony\\Component\\Cache\\Traits\\Relay\\RelayCluster21Trait' => __DIR__ . '/..' . '/symfony/cache/Traits/Relay/RelayCluster21Trait.php',
+        'Symfony\\Component\\Cache\\Traits\\Relay\\RelayCluster30Trait' => __DIR__ . '/..' . '/symfony/cache/Traits/Relay/RelayCluster30Trait.php',
+        'Symfony\\Component\\Cache\\Traits\\Relay\\RelayCluster40Trait' => __DIR__ . '/..' . '/symfony/cache/Traits/Relay/RelayCluster40Trait.php',
         'Symfony\\Component\\Console\\Application' => __DIR__ . '/..' . '/symfony/console/Application.php',
         'Symfony\\Component\\Console\\Attribute\\Argument' => __DIR__ . '/..' . '/symfony/console/Attribute/Argument.php',
         'Symfony\\Component\\Console\\Attribute\\AsCommand' => __DIR__ . '/..' . '/symfony/console/Attribute/AsCommand.php',
@@ -545,6 +556,8 @@ class ComposerStaticInitc79a7dac55f2962b16f0419d5f63472d
         'Symfony\\Contracts\\Cache\\TagAwareCacheInterface' => __DIR__ . '/..' . '/symfony/cache-contracts/TagAwareCacheInterface.php',
         'Symfony\\Contracts\\Service\\Attribute\\Required' => __DIR__ . '/..' . '/symfony/service-contracts/Attribute/Required.php',
         'Symfony\\Contracts\\Service\\Attribute\\SubscribedService' => __DIR__ . '/..' . '/symfony/service-contracts/Attribute/SubscribedService.php',
+        'Symfony\\Contracts\\Service\\ContainerAwareInterface' => __DIR__ . '/..' . '/symfony/service-contracts/ContainerAwareInterface.php',
+        'Symfony\\Contracts\\Service\\ContainerProviderInterface' => __DIR__ . '/..' . '/symfony/service-contracts/ContainerProviderInterface.php',
         'Symfony\\Contracts\\Service\\ResetInterface' => __DIR__ . '/..' . '/symfony/service-contracts/ResetInterface.php',
         'Symfony\\Contracts\\Service\\ServiceCollectionInterface' => __DIR__ . '/..' . '/symfony/service-contracts/ServiceCollectionInterface.php',
         'Symfony\\Contracts\\Service\\ServiceLocatorTrait' => __DIR__ . '/..' . '/symfony/service-contracts/ServiceLocatorTrait.php',
@@ -559,16 +572,16 @@ class ComposerStaticInitc79a7dac55f2962b16f0419d5f63472d
         'Tools\\Rector\\Rector\\Rules\\ArrayGetExprRector' => __DIR__ . '/../../../../../../..' . '/tools/rector/src/Rector/Rules/ArrayGetExprRector.php',
         'Tools\\Rector\\Tests\\Rector\\ArrayGetExprRector\\ArrayGetExprRectorTest' => __DIR__ . '/../../../../../../..' . '/tools/rector/tests/Rector/ArrayGetExprRector/ArrayGetExprRectorTest.php',
         'mikehaertl\\shellcommand\\Command' => __DIR__ . '/..' . '/mikehaertl/php-shellcommand/src/Command.php',
-        'ï¿½' => __DIR__ . '/..' . '/symfony/cache/Traits/ValueWrapper.php',
+        '©' => __DIR__ . '/..' . '/symfony/cache/Traits/ValueWrapper.php',
     );
 
     public static function getInitializer(ClassLoader $loader)
     {
         return \Closure::bind(function () use ($loader) {
-            $loader->prefixLengthsPsr4 = ComposerStaticInitc79a7dac55f2962b16f0419d5f63472d::$prefixLengthsPsr4;
-            $loader->prefixDirsPsr4 = ComposerStaticInitc79a7dac55f2962b16f0419d5f63472d::$prefixDirsPsr4;
-            $loader->prefixesPsr0 = ComposerStaticInitc79a7dac55f2962b16f0419d5f63472d::$prefixesPsr0;
-            $loader->classMap = ComposerStaticInitc79a7dac55f2962b16f0419d5f63472d::$classMap;
+            $loader->prefixLengthsPsr4 = ComposerStaticInitdec2159f616b8728af1a30beb9727558::$prefixLengthsPsr4;
+            $loader->prefixDirsPsr4 = ComposerStaticInitdec2159f616b8728af1a30beb9727558::$prefixDirsPsr4;
+            $loader->prefixesPsr0 = ComposerStaticInitdec2159f616b8728af1a30beb9727558::$prefixesPsr0;
+            $loader->classMap = ComposerStaticInitdec2159f616b8728af1a30beb9727558::$classMap;
 
         }, null, ClassLoader::class);
     }

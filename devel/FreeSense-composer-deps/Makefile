@@ -1,6 +1,5 @@
 PORTNAME=	FreeSense-composer-deps
-DISTVERSION=	0.5
-PORTREVISION=	2
+DISTVERSION=	0.6
 CATEGORIES=	devel
 
 MAINTAINER=	dev@freesense.org
@@ -11,11 +10,11 @@ VENDORBASE=	/FreeSense/include/vendor
 
 NO_BUILD=	yes
 SHCMD_VER=		1.7.0
-UTILS_VER=		v4.1.1
+UTILS_VER=		v4.1.5
 SIMPLECACHE_VER=	3.0.0
 SIMPLEPIE_VER=		1.9.0
-CACHE_VER=		v8.0.5
-CONSOLE_VER=		v8.0.4
+CACHE_VER=		v8.0.15
+CONSOLE_VER=		v8.0.15
 
 USE_GITHUB=	nodefault
 
@@ -31,15 +30,15 @@ GH_TUPLE=	mikehaertl:php-shellcommand:${SHCMD_VER}:shellcommand \
 PSR_CACHE_VER=	3.0.0
 PSR_CONTA_VER=	2.0.2
 PSR_LOG_VER=	3.0.2
-SYM_CACHE_VER=	v3.6.0
-SYM_DEPRE_VER=	v3.6.0
-SYM_CTYPE_VER=	v1.33.0
-SYM_IGRAP_VER=	v1.33.0
-SYM_INORM_VER=	v1.33.0
-SYM_MBSTR_VER=	v1.31.0
-SYM_SERV_VER=	v3.6.1
-SYM_STR_VER=	v8.0.4
-SYM_VAR_VER=	v8.0.0
+SYM_CACHE_VER=	v3.7.1
+SYM_DEPRE_VER=	v3.7.1
+SYM_CTYPE_VER=	v1.37.0
+SYM_IGRAP_VER=	v1.43.0
+SYM_INORM_VER=	v1.43.0
+SYM_MBSTR_VER=	v1.43.0
+SYM_SERV_VER=	v3.7.3
+SYM_STR_VER=	v8.0.15
+SYM_VAR_VER=	v8.0.16
 GH_TUPLE+=	php-fig:cache:${PSR_CACHE_VER}:psrcache \
 		php-fig:container:${PSR_CONTA_VER}:psrcontainer \
 		php-fig:log:${PSR_LOG_VER}:psrlog \
