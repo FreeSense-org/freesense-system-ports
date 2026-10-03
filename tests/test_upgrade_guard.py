@@ -60,8 +60,14 @@ class RepositoryOSVersionTests(unittest.TestCase):
             ROOT / "sysutils" / "FreeSense-repoc" / "Makefile"
         ).read_text(encoding="utf-8")
 
-        self.assertRegex(upgrade_makefile, r"(?m)^PORTREVISION=\s*8$")
+        self.assertRegex(upgrade_makefile, r"(?m)^PORTREVISION=\s*9$")
         self.assertRegex(repoc_makefile, r"(?m)^PORTREVISION=\s*6$")
+
+    def test_unreadable_catalogue_is_not_reported_as_a_php_change(self) -> None:
+        guard = UPGRADE.index('if [ -z "${new_php_pkg}" ]; then')
+        php_check = UPGRADE.index('if [ "${cur_php_pkg}" != "${new_php_pkg}" ]; then')
+        self.assertLess(guard, php_check)
+        self.assertIn("Unable to read the package catalogue", UPGRADE[guard:php_check])
 
     def test_running_userland_is_the_legacy_fallback(self) -> None:
         self.assertIn('OSVERSION="$(uname -U 2>/dev/null || true)"', REPO_SETUP)
