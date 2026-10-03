@@ -60,8 +60,13 @@ class RepositoryOSVersionTests(unittest.TestCase):
             ROOT / "sysutils" / "FreeSense-repoc" / "Makefile"
         ).read_text(encoding="utf-8")
 
-        self.assertRegex(upgrade_makefile, r"(?m)^PORTREVISION=\s*9$")
+        self.assertRegex(upgrade_makefile, r"(?m)^PORTREVISION=\s*10$")
         self.assertRegex(repoc_makefile, r"(?m)^PORTREVISION=\s*6$")
+
+    def test_exit_starts_services_queued_by_pkg_scripts(self) -> None:
+        exit_body = UPGRADE[UPGRADE.index("_exit() {"):]
+        self.assertIn("start_queued_services", exit_body[:200])
+        self.assertIn("/var/run/pkg_service_start.queue", UPGRADE)
 
     def test_unreadable_catalogue_is_not_reported_as_a_php_change(self) -> None:
         guard = UPGRADE.index('if [ -z "${new_php_pkg}" ]; then')

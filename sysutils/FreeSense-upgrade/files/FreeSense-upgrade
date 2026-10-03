@@ -132,8 +132,30 @@ _pkg() {
 	/usr/local/sbin/pkg-static ${PKG_OPTS} "$@" 2>/dev/null
 }
 
+# pkg kills whatever its scripts leave running, so start_service() inside a
+# package's install hook only queues the service (service-utils.inc). Start
+# those now that pkg has finished.
+start_queued_services() {
+	local _queue="/var/run/pkg_service_start.queue"
+
+	[ -s "${_queue}" ] || return 0
+	mv -f "${_queue}" "${_queue}.run" 2>/dev/null || return 0
+	/usr/local/bin/php -r '
+		require_once("config.inc");
+		require_once("service-utils.inc");
+		$names = array_unique(array_filter(array_map("trim",
+		    (array)@file("/var/run/pkg_service_start.queue.run"))));
+		foreach ($names as $name) {
+			start_service($name);
+		}
+	' >/dev/null 2>&1
+	rm -f "${_queue}.run"
+}
+
 _exit() {
 	trap "-" 1 2 15 EXIT
+
+	start_queued_services
 
 	if [ -n "${delete_pid}" -a -f "${pid_file}" ]; then
 		rm -f ${pid_file}
