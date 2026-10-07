@@ -15,6 +15,23 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Enforce repository boundary
         run: python3 tools/boundary_audit.py
+      - name: Resolve matching FreeSense source branch
+        id: source
+        env:
+          CANDIDATE_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          if git ls-remote --exit-code --heads https://github.com/FreeSense-org/freesense.git "${CANDIDATE_REF}" >/dev/null; then
+            echo "ref=${CANDIDATE_REF}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "ref=main" >> "${GITHUB_OUTPUT}"
+          fi
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: FreeSense-org/freesense
+          path: freesense-src
+          ref: ${{ steps.source.outputs.ref }}
+      - name: FreeSense-system pkg-plist matches the source tree
+        run: python3 tools/system_plist_audit.py --source freesense-src
       - name: Reject credentials
         run: |
           if git grep -IEn '(^[[:space:]]*-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----[[:space:]]*$|R2_SECRET_ACCESS_KEY[=:][[:space:]]*[^$<{])'; then
@@ -31,8 +48,8 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get install -yq php-cli
-          find . -type f \( -name '*.php' -o -name '*.inc' \) -print0 | xargs -0 -r -n1 php -l
-          find . -type f \( -name 'pkg-install.in' -o -name 'pkg-deinstall.in' \) -print0 | xargs -0 -r -n1 sh -n
+          find . -type f \( -name '*.php' -o -name '*.inc' \) ! -path './freesense-src/*' -print0 | xargs -0 -r -n1 php -l
+          find . -type f \( -name 'pkg-install.in' -o -name 'pkg-deinstall.in' \) ! -path './freesense-src/*' -print0 | xargs -0 -r -n1 sh -n
           sh -n sysutils/FreeSense-repoc/files/FreeSense-repoc
           sh -n sysutils/FreeSense-cloud-init/files/freesense-cloud-init.in
       - name: Repository updater safety
