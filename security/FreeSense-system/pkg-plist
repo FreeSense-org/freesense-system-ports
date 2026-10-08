@@ -21,7 +21,6 @@
 /etc/inc/config.lib.inc
 /etc/inc/config_import_guard.inc
 /etc/inc/config_import_pkgmap.inc
-/etc/inc/copyget.inc
 /etc/inc/copynotice.inc
 /etc/inc/crypt.inc
 /etc/inc/dyndns.class
