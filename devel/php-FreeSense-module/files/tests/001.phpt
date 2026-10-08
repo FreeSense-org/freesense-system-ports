@@ -1,10 +1,10 @@
 --TEST--
-Check if pfsense is loaded
+Check if FreeSense is loaded
 --EXTENSIONS--
-pfsense
+FreeSense
 --FILE--
 <?php
-echo 'The extension "pfsense" is available';
+echo 'The extension "FreeSense" is available';
 ?>
 --EXPECT--
-The extension "pfsense" is available
+The extension "FreeSense" is available

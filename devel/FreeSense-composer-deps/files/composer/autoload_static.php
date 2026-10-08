@@ -53,7 +53,6 @@ class ComposerStaticInit1d31fa7e3ebe17b7959707503381f817
         'N' =>
         array (
             'Nette\\' => 6,
-            'Netgate\\' => 8,
         ),
         'F' =>
         array (
@@ -145,10 +144,6 @@ class ComposerStaticInit1d31fa7e3ebe17b7959707503381f817
         'Nette\\' =>
         array (
             0 => __DIR__ . '/..' . '/nette/utils/src',
-        ),
-        'Netgate\\' =>
-        array (
-            0 => '//usr/local/FreeSense/include/Netgate',
         ),
         'FreeSense\\' =>
         array (

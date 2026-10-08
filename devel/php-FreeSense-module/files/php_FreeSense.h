@@ -1,7 +1,7 @@
 /*
  * php_pfsense.h
  *
- * part of FreeSense (https://www.pfsense.org)
+ * part of FreeSense (https://www.freesense.org)
  * Copyright (c) 2004-2026 The FreeSense Project
  * All rights reserved.
  *

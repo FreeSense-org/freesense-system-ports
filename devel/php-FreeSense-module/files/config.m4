@@ -1,7 +1,7 @@
-PHP_ARG_ENABLE([pfsense],
-  [whether to enable pfsense support],
-  [AS_HELP_STRING([--enable-pfsense],
-    [Enable pfsense support])],
+PHP_ARG_ENABLE([FreeSense],
+  [whether to enable FreeSense support],
+  [AS_HELP_STRING([--enable-FreeSense],
+    [Enable FreeSense support])],
   [no])
 
 PHP_ADD_INCLUDE(/usr/local/include)
