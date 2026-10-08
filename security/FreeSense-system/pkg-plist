@@ -73,6 +73,7 @@
 /etc/inc/restapi/routes_firewall.inc
 /etc/inc/restapi/routes_interfaces.inc
 /etc/inc/restapi/routes_logs.inc
+/etc/inc/restapi/routes_me.inc
 /etc/inc/restapi/routes_nat.inc
 /etc/inc/restapi/routes_ntp.inc
 /etc/inc/restapi/routes_openvpn.inc
@@ -104,6 +105,7 @@
 /etc/inc/voucher.inc
 /etc/inc/vpn.inc
 /etc/inc/vxlan.inc
+/etc/inc/webui_prefs.inc
 /etc/inc/wizard_utils.inc
 /etc/inc/wizardapp.inc
 /etc/inc/xmlparse.inc
