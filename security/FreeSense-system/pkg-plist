@@ -88,6 +88,7 @@
 /etc/inc/restapi/routes_vpn.inc
 /etc/inc/restapi_listener.inc
 /etc/inc/restapi_log.inc
+/etc/inc/restapi_session.inc
 /etc/inc/rrd.inc
 /etc/inc/service-utils.inc
 /etc/inc/services.inc
