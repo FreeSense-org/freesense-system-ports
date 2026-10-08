@@ -2,7 +2,7 @@
 #
 # pfSense-upgrade
 #
-# part of pfSense (https://www.pfsense.org)
+# part of FreeSense (https://www.freesense.org)
 # Copyright (c) 2004-2026 The FreeSense Project
 # All rights reserved.
 #
@@ -1420,8 +1420,7 @@ pkg_upgrade() {
 			_echo ""
 			_echo "NanoBSD platform is no longer supported."
 			_echo ""
-			_echo "You can find instructions on how to convert it"
-			    "to Full Installation at http://bit.ly/2wDinm8"
+			_echo "Reinstall with the FreeSense installer and restore the configuration backup."
 			_exit 1
 		fi
 
