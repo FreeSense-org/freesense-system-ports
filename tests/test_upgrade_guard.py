@@ -60,7 +60,7 @@ class RepositoryOSVersionTests(unittest.TestCase):
             ROOT / "sysutils" / "FreeSense-repoc" / "Makefile"
         ).read_text(encoding="utf-8")
 
-        self.assertRegex(upgrade_makefile, r"(?m)^PORTREVISION=\s*10$")
+        self.assertRegex(upgrade_makefile, r"(?m)^PORTREVISION=\s*11$")
         self.assertRegex(repoc_makefile, r"(?m)^PORTREVISION=\s*6$")
 
     def test_exit_starts_services_queued_by_pkg_scripts(self) -> None:
