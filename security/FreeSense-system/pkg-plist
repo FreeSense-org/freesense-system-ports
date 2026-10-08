@@ -81,6 +81,7 @@
 /etc/inc/restapi/routes_pki.inc
 /etc/inc/restapi/routes_routing.inc
 /etc/inc/restapi/routes_services.inc
+/etc/inc/restapi/routes_status.inc
 /etc/inc/restapi/routes_system.inc
 /etc/inc/restapi/routes_unbound.inc
 /etc/inc/restapi/routes_users.inc
@@ -93,6 +94,7 @@
 /etc/inc/service-utils.inc
 /etc/inc/services.inc
 /etc/inc/shaper.inc
+/etc/inc/status_metrics.inc
 /etc/inc/syslog.inc
 /etc/inc/system.inc
 /etc/inc/tools_for_debugging_n_testing.inc
