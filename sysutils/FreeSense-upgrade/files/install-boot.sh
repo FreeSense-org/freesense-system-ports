@@ -12,8 +12,7 @@
 fat32min=33292
 fat16min=2100
 
-PRODUCT="pfSense"
-PRODUCT="${PRODUCT}+"
+PRODUCT="FreeSense"
 
 die() {
     echo "$*"

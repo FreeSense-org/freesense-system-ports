@@ -1,9 +1,10 @@
 #!/bin/sh
 #
-# pfSense-upgrade
+# FreeSense-upgrade
 #
 # part of FreeSense (https://www.freesense.org)
-# Copyright (c) 2004-2026 The FreeSense Project
+# Copyright (c) 2015-2026 Rubicon Communications, LLC (Netgate)
+# Copyright (c) 2025-2026 The FreeSense Project
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -300,11 +301,10 @@ be_is_path_on_root()
 # Test the system for boot environment support (e.g. fails on UFS systems)
 #
 # notes:
-#    1. Check if we are on Plus (UB on CE)
-#    2. Check if root is on ZFS
-#    3. Perform a sanity check using `bectl check`
-#    4. Check to see if /cf lives on the root dataset
-#    5. Check to see if /var/db/pkg lives on the root dataset
+#    1. Check if root is on ZFS
+#    2. Perform a sanity check using `bectl check`
+#    3. Check to see if /cf lives on the root dataset
+#    4. Check to see if /var/db/pkg lives on the root dataset
 #
 be_bootenv_check()
 {
@@ -645,19 +645,6 @@ be_migrate()
 	return 0
 }
 
-get_repoc_feat() {
-	local _err _feat
-
-	_feat="$("/usr/local/sbin/pfSense-repoc-static" -f 2>&1)"
-	_err="${?}"
-	if [ "${_err}" -ne 0 ] || [ -z "${_feat}" ]; then
-		echo -n ""
-		return "${_err}"
-	fi
-	echo -n "${_feat}"
-	return 0
-}
-
 notice() {
 	msg="$@"
 
@@ -764,55 +751,6 @@ unset_vital_flag() {
 
 is_amd64() {
 	[ -n "${ARCH}" ] && [ "${ARCH}" = "amd64" ]
-}
-
-is_ce() {
-	[ "${product_label}" == "pfSense" ]
-}
-
-is_plus() {
-	!(is_ce)
-}
-
-get_repo_path() {
-	local _repo_name="${1}"
-
-	# If the argument is a repo name, look for the respective repo conf path
-	for file in "${PLUS_CERT_BASE}/pfSense-repo-"*".name"; do
-		if [ ! -f "${file}" ]; then
-			continue
-		fi
-		if [ "$(/bin/cat ${file})" = "${_repo_name}" ]; then
-			echo -n "${file%.name}.conf"
-			return
-		fi
-	done
-
-	# No path found, return the given value
-	echo -n "${_repo_name}"
-	return
-}
-
-repo_is_plus_upgrade() {
-	pkg_repo_conf_path=$(read_xml_tag.sh string system/pkg_repo_conf_path)
-	# If the value is a repo name, get its path
-	pkg_repo_conf_path="$(get_repo_path "${pkg_repo_conf_path}")"
-
-	if [ -n "$(echo $pkg_repo_conf_path | grep ${product}-repo-custom)" ]; then
-		return 0
-	fi
-	return 1
-}
-
-custom_repo_cleanup() {
-	local _custom_repo_files="/usr/local/share/${product}/pkg/repos/${product}-repo-custom.*"
-
-	/usr/local/bin/php -r \
-	    "require_once('config.inc'); \
-	     require_once('config.lib.inc'); \
-	     config_del_path('system/pkg_repo_conf_path'); \
-	     write_config('Remove the pfSense Plus upgrade repo');"
-	/bin/rm -f ${_custom_repo_files}
 }
 
 copy_dtb() {
@@ -1465,8 +1403,7 @@ pkg_upgrade() {
 		#
 		# Here we branch if we can use the new BE-based upgrade mechanism
 		#
-		if is_plus && be_enabled && \
-			be_bootenv_check; then
+		if be_enabled && be_bootenv_check; then
 				be_pkg_upgrade
 				_exit 0
 		fi
@@ -1775,11 +1712,6 @@ pkg_upgrade() {
 		# Cleanup a possible crash report created during PHP upgrade
 		rm -f /tmp/PHP_errors.log
 
-		# Remove the pfSense Plus upgrade repository.
-		if is_plus -a repo_is_plus_upgrade ; then
-			custom_repo_cleanup
-		fi
-
 		_pkg annotate -q -D ${kernel_pkg} next_stage
 
 		# cleanup caches
@@ -1928,145 +1860,28 @@ There are no new releases for the SG-1000."
 	    && pkg_update "" mute
 
 	local _version_compare=""
-	local _installed_version=""
-	if [ "${action}" == "checkall" ]; then
-		local _rel_feat _rel_sup
-
-		# Get newest of meta or core packages as our baseline version
-		for _package in ${_core_pkgs} ${_meta_pkg}; do
-			local _other_version=$(_pkg query %v ${_package})
-			if [ -z "${_installed_version}" ] || [ $(_pkg version -t ${_installed_version} ${_other_version}) ]; then
-				_installed_version=${_other_version}
-			fi
-		done
-
-		_rel_sup="0"
-		_rel_feat="$(get_repoc_feat | /usr/bin/grep -c "is-release")"
-		[ "${?}" -eq 0 ] && [ "${_rel_feat}" = "1" ] && \
-		    _rel_sup="1"
-
-		local _new_version="0"
-		local _version_compare=""
-		local _db_dir="/tmp/db/pfSense/pkg"
-		for _repo in /usr/local/etc/pfSense/pkg/repos/*.conf; do
-			local _name _reponame _reponpath _repoid _repopath _reporel
-			local _is_configured_repo
-
-			_repopath=""
-			_reponame="$(echo -n $_repo | sed 's/.*pfSense-repo-\(.*\).conf/\1/g')"
-			_is_configured_repo="0"
-			[ "${_repo}" = "$(stat -f %Y /usr/local/etc/pkg/repos/pfSense.conf)" ] && \
-				_is_configured_repo="1"
-			_reponpath="/usr/local/etc/pfSense/pkg/repos/pfSense-repo-${_reponame}.name"
-			if [ -f "${_reponpath}" ]; then
-				_name="$(/bin/cat "${_reponpath}")"
-				[ "${_name}" = "${_reponame}" ] && \
-				    _repopath="${_db_dir}/${_reponame}"
-			fi
-
-			if [ -z "${_repopath}" ]; then
-				_repoid="$(echo -n $_repo | sed 's/.*pfSense-repo-\(.*\).conf/\1/g')"
-				_reponpath="/usr/local/etc/pfSense/pkg/repos/pfSense-repo-${_repoid}.name"
-				_reporel="/usr/local/etc/pfSense/pkg/repos/pfSense-repo-${_repoid}.release"
-				if [ -f "${_reponpath}" ]; then
-					_reponame="$(/bin/cat "${_reponpath}")"
-					_repopath="${_db_dir}/${_reponame}"
-					# Skip the development builds.
-					if [ "${_rel_sup}" = "1" ] && \
-					    [ "${_is_configured_repo}" = "0" ] && \
-					    [ ! -f "${_reporel}" ]; then
-						continue
-					fi
-				fi
-			fi
-			if [ -z "${_repopath}" ] || [ -z "${_reponame}" ]; then
-				continue
-			fi
-
-			#
-			# Backward compatibility when pfSense-repoc does not
-			# support the 'is-release' flag.
-			#
-			if [ "${_rel_sup}" != "1" ]; then
-				# Skip repos with devel names as well as CE->Plus upgrades
-				case "${_reponame}" in
-					devel)
-						continue
-						;;
-					*-devel)
-						continue
-						;;
-					*-preview)
-						continue
-						;;
-					*-upgrade)
-						continue
-						;;
-					*)
-						;;
-				esac
-			fi
-
-			local _pkg_args=""
-			local _pkgs="${_core_pkgs} ${_meta_pkg}"
-			if [ ${_is_configured_repo} -eq 0 ]; then
-				_pkg_args="-C ${_repopath}/pkg.conf"
-				# No repo db files, initialize
-				if [ ! -f "${_db_dir}/${_reponame}/db/repo-pfSense.sqlite" ] ||
-				   [ ! -f "${_db_dir}/${_reponame}/db/repo-pfSense-core.sqlite" ]; then
-					mkdir -p "${_repopath}"
-					pfSense-repo-setup "${_db_dir}/${_reponame}" "${_repo}" > /dev/null 2>&1
-					_pkg ${_pkg_args} update > /dev/null 2>&1
-				fi
-			fi
-
-			for _package in ${_pkgs}; do
-				if [ ${_is_configured_repo} -eq 0 ]; then
-				   	_version_compare=$(compare_pkg_version "${_package}" "${_new_version}" "${_repopath}/pkg.conf")
-				else
-					_version_compare=$(compare_pkg_version "${_package}" "${_new_version}")
-				fi
-				if [ "${_version_compare}" == "<" ]; then
-					_new_version="$(_pkg ${_pkg_args} rquery -U %v ${_package})"
-				fi
-			done
-		done
-		_version_compare=$(_pkg version -t "${_installed_version}" "${_new_version}")
+	# FreeSense: -C (checkall) checks the selected channel, like -c. The
+	# channel is chosen in System > Update; other channels are never offered
+	# here (Development is unsupported and 1.1 cannot go back to 1.0).
+	for _package in ${_core_pkgs} ${_meta_pkg}; do
+		_version_compare=$(compare_pkg_version ${_package})
 		case "${_version_compare}" in
-			'<')
-				if [ -z "${_mute}" ]; then
-					_echo "${_new_version} version of ${product} is available"
-				fi
-				return 2
+			!|=)
+				continue
 				;;
 			'>')
-				if [ -z "${_mute}" ]; then
-				    _echo "Your system is on a newer version"
-				fi
+				[ -z "${_mute}" ] \
+					&& _echo "Your system is on a newer version"
 				return 0
 				;;
 		esac
-	else
-		for _package in ${_core_pkgs} ${_meta_pkg}; do
-			_version_compare=$(compare_pkg_version ${_package})
-			case "${_version_compare}" in
-				!|=)
-					continue
-					;;
-				'>')
-					[ -z "${_mute}" ] \
-						&& _echo "Your system is on a newer version"
-					return 0
-					;;
-			esac
 
-			_new_version="$(_pkg ${_pkg} rquery -U %v ${_package})"
-			if [ -z "${_mute}" ]; then
-				_echo "${_new_version} version of ${product} is available"
-			fi
-			return 2
-		done
-	fi
+		_new_version="$(_pkg ${_pkg} rquery -U %v ${_package})"
+		if [ -z "${_mute}" ]; then
+			_echo "${_new_version} version of ${product} is available"
+		fi
+		return 2
+	done
 	[ -z "${_mute}" ] \
 	    && _echo "Your system is up to date"
 	return 0
@@ -2348,10 +2163,10 @@ export ASSUME_ALWAYS_YES=true
 export FETCH_TIMEOUT=5
 export FETCH_RETRY=2
 
-export product=$(php -n /usr/local/sbin/read_global_var product_name pfSense)
-export product_label=$(php -n /usr/local/sbin/read_global_var product_label pfSense)
+export product=$(php -n /usr/local/sbin/read_global_var product_name FreeSense)
+export product_label=$(php -n /usr/local/sbin/read_global_var product_label FreeSense)
 export pkg_prefix=$(php -n /usr/local/sbin/read_global_var pkg_prefix \
-    pfSense-pkg-)
+    FreeSense-pkg-)
 export platform=$(cat /etc/platform)
 
 USE_MFS_TMPVAR=$(read_xml_tag.sh boolean system/use_mfs_tmpvar)

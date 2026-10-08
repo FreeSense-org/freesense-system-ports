@@ -13,6 +13,6 @@ PHP_ADD_LIBRARY_WITH_PATH(vici, /usr/local/lib/ipsec, FREESENSE_SHARED_LIBADD)
 PHP_SUBST(FREESENSE_SHARED_LIBADD)
 
 if test "$PHP_FREESENSE" != "no"; then
-  AC_DEFINE(HAVE_PFSENSE, 1, [ Have pfsense support ])
+  AC_DEFINE(HAVE_FREESENSE, 1, [ Have FreeSense support ])
   PHP_NEW_EXTENSION(FreeSense, FreeSense.c %%DUMMYNET%% %%ETHERSWITCH%%, $ext_shared)
 fi

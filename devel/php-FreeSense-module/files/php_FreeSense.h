@@ -1,8 +1,9 @@
 /*
- * php_pfsense.h
+ * php_FreeSense.h
  *
  * part of FreeSense (https://www.freesense.org)
- * Copyright (c) 2004-2026 The FreeSense Project
+ * Copyright (c) 2004-2026 Rubicon Communications, LLC (Netgate)
+ * Copyright (c) 2025-2026 The FreeSense Project
  * All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,11 +19,11 @@
  * limitations under the License.
  */
 
-#ifndef PHP_PFSENSE_H
-# define PHP_PFSENSE_H
+#ifndef PHP_FREESENSE_H
+# define PHP_FREESENSE_H
 
-extern zend_module_entry pfsense_module_entry;
-# define phpext_pfsense_ptr &pfsense_module_entry
+extern zend_module_entry FreeSense_module_entry;
+# define phpext_FreeSense_ptr &FreeSense_module_entry
 
 # ifndef PHP_FREESENSE_VERSION
 #  define PHP_FREESENSE_VERSION "0.1.0"
@@ -32,4 +33,4 @@ extern zend_module_entry pfsense_module_entry;
 ZEND_TSRMLS_CACHE_EXTERN()
 # endif
 
-#endif	/* PHP_PFSENSE_H */
+#endif	/* PHP_FREESENSE_H */

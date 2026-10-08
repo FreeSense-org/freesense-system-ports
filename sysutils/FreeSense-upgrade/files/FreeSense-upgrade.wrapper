@@ -1,9 +1,10 @@
 #!/bin/sh
 #
-# pfSense-upgrade.wrapper
+# FreeSense-upgrade.wrapper
 #
 # part of FreeSense (https://www.freesense.org)
-# Copyright (c) 2004-2026 The FreeSense Project
+# Copyright (c) 2015-2026 Rubicon Communications, LLC (Netgate)
+# Copyright (c) 2025-2026 The FreeSense Project
 # All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,12 +19,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-pfsense_upgrade=$(realpath -q $(dirname $0)/../libexec/$(basename $0))
+freesense_upgrade=$(realpath -q $(dirname $0)/../libexec/$(basename $0))
 lockfile="/tmp/$(basename $0).lock"
 lockf_timeout="5"
 
-if [ ! -f ${pfsense_upgrade} ]; then
-	echo "ERROR: Unable to find ${pfsense_upgrade}"
+if [ ! -f ${freesense_upgrade} ]; then
+	echo "ERROR: Unable to find ${freesense_upgrade}"
 	exit 1
 fi
 
@@ -42,7 +43,7 @@ while getopts 46b:cCdfi:hp:l:nr:RT:uUy opt; do
 		lockf_timeout="$(printf "%d" "${OPTARG}" 2> /dev/null)"
 		;;
 	"?")
-		"${pfsense_upgrade}" -h
+		"${freesense_upgrade}" -h
 		exit 1
 		;;
 	*)
@@ -70,13 +71,13 @@ EX_OSERR=71	# A system call (e.g., fork(2)) failed unexpectedly.
 EX_SOFTWARE=70	# The command did not exit normally, but may have been signaled
 		# or stopped.
 
-# Special return code to detect when pfSense-upgrade was upgraded and must
+# Special return code to detect when FreeSense-upgrade was upgraded and must
 # be called again to make sure latest version is running
 EX_UPGRADE=99
 
 while true; do
 	unset run_again
-	/usr/bin/lockf -s -t "${lockf_timeout}" ${lockfile} ${pfsense_upgrade} "$@"
+	/usr/bin/lockf -s -t "${lockf_timeout}" ${lockfile} ${freesense_upgrade} "$@"
 	rc=$?
 
 	unset error
