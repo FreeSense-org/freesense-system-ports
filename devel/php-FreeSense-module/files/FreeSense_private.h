@@ -1,5 +1,5 @@
 /*
- * pfsense_private.h
+ * FreeSense_private.h
  *
  * part of FreeSense (https://www.freesense.org)
  * Copyright (c) 2022-2026 Rubicon Communications, LLC (Netgate)
@@ -19,8 +19,8 @@
  * limitations under the License.
  */
 
-#ifndef _PFSENSE_PRIVATE_H
-#define _PFSENSE_PRIVATE_H
+#ifndef _FREESENSE_PRIVATE_H
+#define _FREESENSE_PRIVATE_H
 
 #include "php_FreeSense.h"
 
@@ -86,6 +86,6 @@ ZEND_END_MODULE_GLOBALS(FreeSense)
 
 ZEND_EXTERN_MODULE_GLOBALS(FreeSense)
 
-#define PFSENSE_G(v) ZEND_MODULE_GLOBALS_ACCESSOR(FreeSense, v)
+#define FREESENSE_G(v) ZEND_MODULE_GLOBALS_ACCESSOR(FreeSense, v)
 
 #endif

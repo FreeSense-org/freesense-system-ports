@@ -1,5 +1,5 @@
 /*
- * pfsense.c
+ * FreeSense.c
  *
  * part of FreeSense (https://www.freesense.org)
  * Copyright (c) 2004-2026 Rubicon Communications, LLC (Netgate)
@@ -1577,7 +1577,7 @@ fill_interface_params(zval *val, struct ifaddrs *mb)
 		case IFT_FASTETHER:
 		case IFT_FASTETHERFX:
 		case IFT_GIGABITETHERNET:
-			if (ioctl(PFSENSE_G(s), SIOCG80211STATS,
+			if (ioctl(FREESENSE_G(s), SIOCG80211STATS,
 			    (caddr_t)&ifr) == 0) {
 				add_assoc_string(val, "iftype",
 				    "wireless");
@@ -1615,9 +1615,9 @@ fill_interface_params(zval *val, struct ifaddrs *mb)
 	/* Interface-wide parameters */
 	array_init(&caps);
 	array_init(&encaps);
-	if (ioctl(PFSENSE_G(s), SIOCGIFMTU, (caddr_t)&ifr) == 0)
+	if (ioctl(FREESENSE_G(s), SIOCGIFMTU, (caddr_t)&ifr) == 0)
 		add_assoc_long(val, "mtu", ifr.ifr_mtu);
-	if (ioctl(PFSENSE_G(s), SIOCGIFCAP, (caddr_t)&ifr) == 0) {
+	if (ioctl(FREESENSE_G(s), SIOCGIFCAP, (caddr_t)&ifr) == 0) {
 		add_assoc_long(&caps, "flags", ifr.ifr_reqcap);
 		if (ifr.ifr_reqcap & IFCAP_POLLING)
 			add_assoc_long(&caps, "polling", 1);
@@ -1709,7 +1709,7 @@ fill_interface_params(zval *val, struct ifaddrs *mb)
 		    sizeof(mb->ifa_addr->sa_len));
 		ifr.ifr_addr.sa_family = AF_LOCAL;
 	}
-	if (ioctl(PFSENSE_G(s), SIOCGHWADDR, &ifr) == 0) {
+	if (ioctl(FREESENSE_G(s), SIOCGHWADDR, &ifr) == 0) {
 		bzero(outputbuf, sizeof outputbuf);
 		ether_ntoa_r((const struct ether_addr *)&ifr.ifr_addr.sa_data,
 		    outputbuf);
@@ -1731,13 +1731,13 @@ fill_interface_tunnel(zval *val, char *ifname, u_short af) {
 	case AF_INET:
 		srccmd = SIOCGIFPSRCADDR;
 		dstcmd = SIOCGIFPDSTADDR;
-		sockfd = PFSENSE_G(inets);
+		sockfd = FREESENSE_G(inets);
 		zval_key = "tunnel";
 		break;
 	case AF_INET6:
 		srccmd = SIOCGIFPSRCADDR_IN6;
 		dstcmd = SIOCGIFPDSTADDR_IN6;
-		sockfd = PFSENSE_G(inets6);
+		sockfd = FREESENSE_G(inets6);
 		zval_key = "tunnel6";
 		break;
 	default:
@@ -1890,7 +1890,7 @@ PHP_FUNCTION(FreeSense_get_ifaddrs)
 			strncpy(ifr6.ifr_name, mb->ifa_name,
 			    sizeof(ifr6.ifr_name));
 			memcpy(&ifr6.ifr_ifru.ifru_addr, tmp6, tmp6->sin6_len);
-			if (ioctl(PFSENSE_G(inets6),
+			if (ioctl(FREESENSE_G(inets6),
 			    SIOCGIFAFLAG_IN6, &ifr6) == 0) {
 				llflag = ifr6.ifr_ifru.ifru_flags6;
 				if ((llflag & IN6_IFF_ANYCAST) != 0)
@@ -2043,7 +2043,7 @@ PHP_FUNCTION(FreeSense_get_interface_addresses)
 			strncpy(ifr6.ifr_name, mb->ifa_name,
 			    sizeof(ifr6.ifr_name));
 			memcpy(&ifr6.ifr_ifru.ifru_addr, tmp6, tmp6->sin6_len);
-			if (ioctl(PFSENSE_G(inets6),
+			if (ioctl(FREESENSE_G(inets6),
 			    SIOCGIFAFLAG_IN6, &ifr6) == 0) {
 				llflag = ifr6.ifr_ifru.ifru_flags6;
 				if ((llflag & IN6_IFF_TENTATIVE) != 0)
@@ -2095,7 +2095,7 @@ PHP_FUNCTION(FreeSense_bridge_add_member) {
 	drv.ifd_cmd = BRDGADD;
 	drv.ifd_data = &req;
 	drv.ifd_len = sizeof(req);
-	if (ioctl(PFSENSE_G(s), SIOCSDRVSPEC, (caddr_t)&drv) < 0)
+	if (ioctl(FREESENSE_G(s), SIOCSDRVSPEC, (caddr_t)&drv) < 0)
 		RETURN_FALSE;
 
 	RETURN_TRUE;
@@ -2119,7 +2119,7 @@ PHP_FUNCTION(FreeSense_bridge_del_member) {
 	drv.ifd_cmd = BRDGDEL;
 	drv.ifd_data = &req;
 	drv.ifd_len = sizeof(req);
-	if (ioctl(PFSENSE_G(s), SIOCSDRVSPEC, (caddr_t)&drv) < 0)
+	if (ioctl(FREESENSE_G(s), SIOCSDRVSPEC, (caddr_t)&drv) < 0)
 		RETURN_FALSE;
 
 	RETURN_TRUE;
@@ -2145,7 +2145,7 @@ PHP_FUNCTION(FreeSense_bridge_member_flags) {
 	drv.ifd_cmd = BRDGGIFFLGS;
 	drv.ifd_data = &req;
 	drv.ifd_len = sizeof(req);
-	if (ioctl(PFSENSE_G(s), SIOCGDRVSPEC, (caddr_t)&drv) < 0)
+	if (ioctl(FREESENSE_G(s), SIOCGDRVSPEC, (caddr_t)&drv) < 0)
 		RETURN_FALSE;
 
 	if (flags < 0) {
@@ -2157,7 +2157,7 @@ PHP_FUNCTION(FreeSense_bridge_member_flags) {
 	drv.ifd_cmd = BRDGSIFFLGS;
 	drv.ifd_data = &req;
 	drv.ifd_len = sizeof(req);
-	if (ioctl(PFSENSE_G(s), SIOCSDRVSPEC, (caddr_t)&drv) < 0)
+	if (ioctl(FREESENSE_G(s), SIOCSDRVSPEC, (caddr_t)&drv) < 0)
 		RETURN_FALSE;
 
 	RETURN_TRUE;
@@ -2207,7 +2207,7 @@ static int interface_create(char *ifname, unsigned long op, zend_string **str, z
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 
 	*str = NULL;
-	if (ioctl(PFSENSE_G(s), op, &ifr) == -1) {
+	if (ioctl(FREESENSE_G(s), op, &ifr) == -1) {
 		array_init(return_value);
 		add_assoc_string(return_value, "error", "Could not create interface");
 		return (-1);
@@ -2255,7 +2255,7 @@ PHP_FUNCTION(FreeSense_interface_destroy) {
 
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-	if (ioctl(PFSENSE_G(s), SIOCIFDESTROY, &ifr) < 0) {
+	if (ioctl(FREESENSE_G(s), SIOCIFDESTROY, &ifr) < 0) {
 		array_init(return_value);
 		add_assoc_string(return_value, "error", "Could not destroy interface");
 	} else
@@ -2298,7 +2298,7 @@ PHP_FUNCTION(FreeSense_interface_setaddress) {
 	if (inet_pton(AF_INET, ip, &sin->sin_addr) <= 0)
 		RETURN_FALSE;
 
-	if (ioctl(PFSENSE_G(inets), SIOCAIFADDR, &ifra) < 0) {
+	if (ioctl(FREESENSE_G(inets), SIOCAIFADDR, &ifra) < 0) {
 		array_init(return_value);
 		add_assoc_string(return_value, "error", "Could not set interface address");
 	} else
@@ -2326,7 +2326,7 @@ PHP_FUNCTION(FreeSense_interface_deladdress) {
 		if (inet_pton(AF_INET6, ip, &sin6->sin6_addr) <= 0)
 			RETURN_FALSE;
 
-		if (ioctl(PFSENSE_G(inets6), SIOCDIFADDR_IN6, &ifra6) < 0) {
+		if (ioctl(FREESENSE_G(inets6), SIOCDIFADDR_IN6, &ifra6) < 0) {
 			array_init(return_value);
 			add_assoc_string(return_value, "error", "Could not delete interface address");
 		} else
@@ -2344,7 +2344,7 @@ PHP_FUNCTION(FreeSense_interface_deladdress) {
 		if (inet_pton(AF_INET, ip, &sin->sin_addr) <= 0)
 			RETURN_FALSE;
 
-		if (ioctl(PFSENSE_G(inets), SIOCDIFADDR, &ifra) < 0) {
+		if (ioctl(FREESENSE_G(inets), SIOCDIFADDR, &ifra) < 0) {
 			array_init(return_value);
 			add_assoc_string(return_value, "error", "Could not delete interface address");
 		} else
@@ -2365,7 +2365,7 @@ PHP_FUNCTION(FreeSense_interface_rename) {
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 	ifr.ifr_data = (caddr_t) newifname;
-	if (ioctl(PFSENSE_G(s), SIOCSIFNAME, (caddr_t) &ifr) < 0) {
+	if (ioctl(FREESENSE_G(s), SIOCSIFNAME, (caddr_t) &ifr) < 0) {
 		array_init(return_value);
 		add_assoc_string(return_value, "error", "Could not rename interface");
 	} else
@@ -2381,11 +2381,11 @@ PHP_FUNCTION(FreeSense_ngctl_name) {
 		Z_PARAM_STRING(newifname, newifname_len)
 	ZEND_PARSE_PARAMETERS_END();
 
-	if (PFSENSE_G(csock) == -1)
+	if (FREESENSE_G(csock) == -1)
 		RETURN_NULL();
 
 	/* Send message */
-	if (NgNameNode(PFSENSE_G(csock), ifname, "%s", newifname) < 0)
+	if (NgNameNode(FREESENSE_G(csock), ifname, "%s", newifname) < 0)
 		RETURN_NULL();
 
 	RETURN_TRUE;
@@ -2407,7 +2407,7 @@ PHP_FUNCTION(FreeSense_interface_setpcp)
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 	ifr.ifr_vlan_pcp = (u_short) pcp;
 
-	if (ioctl(PFSENSE_G(s), SIOCSLANPCP, (caddr_t) &ifr) == -1)
+	if (ioctl(FREESENSE_G(s), SIOCSLANPCP, (caddr_t) &ifr) == -1)
 		RETURN_FALSE;
 
 	RETURN_TRUE;
@@ -2434,10 +2434,10 @@ PHP_FUNCTION(FreeSense_vlan_create) {
 	strlcpy(params.vlr_parent, parentifname, sizeof(params.vlr_parent));
 	params.vlr_tag = (u_short) tag;
 	ifr.ifr_data = (caddr_t) &params;
-	if (ioctl(PFSENSE_G(s), SIOCSETVLAN, (caddr_t) &ifr) < 0)
+	if (ioctl(FREESENSE_G(s), SIOCSETVLAN, (caddr_t) &ifr) < 0)
 		RETURN_NULL();
 	ifr.ifr_vlan_pcp = (u_short) pcp;
-	if (ioctl(PFSENSE_G(s), SIOCSVLANPCP, (caddr_t) &ifr) < 0)
+	if (ioctl(FREESENSE_G(s), SIOCSVLANPCP, (caddr_t) &ifr) < 0)
 		RETURN_NULL();
 
 	RETURN_TRUE;
@@ -2454,7 +2454,7 @@ PHP_FUNCTION(FreeSense_interface_getmtu) {
 
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-	if (ioctl(PFSENSE_G(s), SIOCGIFMTU, (caddr_t)&ifr) < 0)
+	if (ioctl(FREESENSE_G(s), SIOCGIFMTU, (caddr_t)&ifr) < 0)
 		RETURN_NULL();
 	array_init(return_value);
 	add_assoc_long(return_value, "mtu", ifr.ifr_mtu);
@@ -2474,7 +2474,7 @@ PHP_FUNCTION(FreeSense_interface_mtu) {
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 	ifr.ifr_mtu = (int) mtu;
-	if (ioctl(PFSENSE_G(s), SIOCSIFMTU, (caddr_t)&ifr) < 0)
+	if (ioctl(FREESENSE_G(s), SIOCSIFMTU, (caddr_t)&ifr) < 0)
 		RETURN_NULL();
 	RETURN_TRUE;
 }
@@ -2493,7 +2493,7 @@ PHP_FUNCTION(FreeSense_interface_flags) {
 
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-	if (ioctl(PFSENSE_G(s), SIOCGIFFLAGS, (caddr_t)&ifr) < 0) {
+	if (ioctl(FREESENSE_G(s), SIOCGIFFLAGS, (caddr_t)&ifr) < 0) {
 		RETURN_NULL();
 	}
 	flags = (ifr.ifr_flags & 0xffff) | (ifr.ifr_flagshigh << 16);
@@ -2504,7 +2504,7 @@ PHP_FUNCTION(FreeSense_interface_flags) {
 		flags |= (int)value;
 	ifr.ifr_flags = flags & 0xffff;
 	ifr.ifr_flagshigh = flags >> 16;
-	if (ioctl(PFSENSE_G(s), SIOCSIFFLAGS, (caddr_t)&ifr) < 0)
+	if (ioctl(FREESENSE_G(s), SIOCSIFFLAGS, (caddr_t)&ifr) < 0)
 		RETURN_NULL();
 	RETURN_TRUE;
 }
@@ -2523,7 +2523,7 @@ PHP_FUNCTION(FreeSense_interface_capabilities) {
 
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-	if (ioctl(PFSENSE_G(s), SIOCGIFCAP, (caddr_t)&ifr) < 0) {
+	if (ioctl(FREESENSE_G(s), SIOCGIFCAP, (caddr_t)&ifr) < 0) {
 		RETURN_NULL();
 	}
 	flags = ifr.ifr_curcap;
@@ -2534,7 +2534,7 @@ PHP_FUNCTION(FreeSense_interface_capabilities) {
 		flags |= (int)value;
 	flags &= ifr.ifr_reqcap;
 	ifr.ifr_reqcap = flags;
-	if (ioctl(PFSENSE_G(s), SIOCSIFCAP, (caddr_t)&ifr) < 0)
+	if (ioctl(FREESENSE_G(s), SIOCSIFCAP, (caddr_t)&ifr) < 0)
 		RETURN_NULL();
 	RETURN_TRUE;
 
@@ -3871,23 +3871,23 @@ PHP_FUNCTION(FreeSense_kenv_dump) {
 	free(buf);
 }
 
-PHP_MINIT_FUNCTION(pfsense)
+PHP_MINIT_FUNCTION(FreeSense)
 {
 	int csock;
 
-	PFSENSE_G(s) = socket(AF_LOCAL, SOCK_DGRAM, 0);
-	if (PFSENSE_G(s) < 0)
+	FREESENSE_G(s) = socket(AF_LOCAL, SOCK_DGRAM, 0);
+	if (FREESENSE_G(s) < 0)
 		return FAILURE;
 
-	PFSENSE_G(inets) = socket(AF_INET, SOCK_DGRAM, 0);
-	if (PFSENSE_G(inets) < 0) {
-		close(PFSENSE_G(s));
+	FREESENSE_G(inets) = socket(AF_INET, SOCK_DGRAM, 0);
+	if (FREESENSE_G(inets) < 0) {
+		close(FREESENSE_G(s));
 		return FAILURE;
 	}
-	PFSENSE_G(inets6) = socket(AF_INET6, SOCK_DGRAM, 0);
-	if (PFSENSE_G(inets6) < 0) {
-		close(PFSENSE_G(s));
-		close(PFSENSE_G(inets));
+	FREESENSE_G(inets6) = socket(AF_INET6, SOCK_DGRAM, 0);
+	if (FREESENSE_G(inets6) < 0) {
+		close(FREESENSE_G(s));
+		close(FREESENSE_G(inets));
 		return FAILURE;
 	}
 
@@ -3898,20 +3898,20 @@ PHP_MINIT_FUNCTION(pfsense)
 		else
 			fcntl(csock, F_SETFD, fcntl(csock, F_GETFD, 0) | FD_CLOEXEC);
 
-		PFSENSE_G(csock) = csock;
+		FREESENSE_G(csock) = csock;
 
 #ifdef DHCP_INTEGRATION
-		FreeSense_dhcpd = zend_register_list_destructors_ex(php_FreeSense_destroy_dhcpd, NULL, PHP_PFSENSE_RES_NAME, module_number);
+		FreeSense_dhcpd = zend_register_list_destructors_ex(php_FreeSense_destroy_dhcpd, NULL, PHP_FREESENSE_RES_NAME, module_number);
 		dhcpctl_initialize();
 		omapi_init();
 #endif
 	} else
-		PFSENSE_G(csock) = -1;
+		FREESENSE_G(csock) = -1;
 
 	/* Don't leak these sockets to child processes */
-	fcntl(PFSENSE_G(s), F_SETFD, fcntl(PFSENSE_G(s), F_GETFD, 0) | FD_CLOEXEC);
-	fcntl(PFSENSE_G(inets), F_SETFD, fcntl(PFSENSE_G(inets), F_GETFD, 0) | FD_CLOEXEC);
-	fcntl(PFSENSE_G(inets6), F_SETFD, fcntl(PFSENSE_G(inets6), F_GETFD, 0) | FD_CLOEXEC);
+	fcntl(FREESENSE_G(s), F_SETFD, fcntl(FREESENSE_G(s), F_GETFD, 0) | FD_CLOEXEC);
+	fcntl(FREESENSE_G(inets), F_SETFD, fcntl(FREESENSE_G(inets), F_GETFD, 0) | FD_CLOEXEC);
+	fcntl(FREESENSE_G(inets6), F_SETFD, fcntl(FREESENSE_G(inets6), F_GETFD, 0) | FD_CLOEXEC);
 
 	REGISTER_LONG_CONSTANT("IFF_UP", IFF_UP, CONST_PERSISTENT | CONST_CS);
 	REGISTER_LONG_CONSTANT("IFF_LINK0", IFF_LINK0, CONST_PERSISTENT | CONST_CS);
@@ -3960,22 +3960,22 @@ PHP_MINIT_FUNCTION(pfsense)
 	return SUCCESS;
 }
 
-PHP_MSHUTDOWN_FUNCTION(pfsense)
+PHP_MSHUTDOWN_FUNCTION(FreeSense)
 {
-	if (PFSENSE_G(csock) != -1)
-		close(PFSENSE_G(csock));
-	if (PFSENSE_G(inets) != -1)
-		close(PFSENSE_G(inets));
-	if (PFSENSE_G(inets6) != -1)
-		close(PFSENSE_G(inets6));
-	if (PFSENSE_G(s) != -1)
-		close(PFSENSE_G(s));
+	if (FREESENSE_G(csock) != -1)
+		close(FREESENSE_G(csock));
+	if (FREESENSE_G(inets) != -1)
+		close(FREESENSE_G(inets));
+	if (FREESENSE_G(inets6) != -1)
+		close(FREESENSE_G(inets6));
+	if (FREESENSE_G(s) != -1)
+		close(FREESENSE_G(s));
 
 	return SUCCESS;
 }
 
 /* {{{ PHP_RINIT_FUNCTION */
-PHP_RINIT_FUNCTION(pfsense)
+PHP_RINIT_FUNCTION(FreeSense)
 {
 #if defined(ZTS) && defined(COMPILE_DL_FREESENSE)
 	ZEND_TSRMLS_CACHE_UPDATE();
@@ -3986,25 +3986,25 @@ PHP_RINIT_FUNCTION(pfsense)
 /* }}} */
 
 /* {{{ PHP_MINFO_FUNCTION */
-PHP_MINFO_FUNCTION(pfsense)
+PHP_MINFO_FUNCTION(FreeSense)
 {
 	php_info_print_table_start();
-	php_info_print_table_header(2, "pfsense support", "enabled");
+	php_info_print_table_header(2, "FreeSense support", "enabled");
 	php_info_print_table_header(2, "Version", PHP_FREESENSE_VERSION);
 	php_info_print_table_end();
 }
 /* }}} */
 
-/* {{{ pfsense_module_entry */
-zend_module_entry pfsense_module_entry = {
+/* {{{ FreeSense_module_entry */
+zend_module_entry FreeSense_module_entry = {
 	STANDARD_MODULE_HEADER,
 	"FreeSense",						/* Extension name */
 	ext_functions,					/* zend_function_entry */
-	PHP_MINIT(pfsense),				/* PHP_MINIT - Module initialization */
-	PHP_MSHUTDOWN(pfsense),			/* PHP_MSHUTDOWN - Module shutdown */
-	PHP_RINIT(pfsense),				/* PHP_RINIT - Request initialization */
+	PHP_MINIT(FreeSense),				/* PHP_MINIT - Module initialization */
+	PHP_MSHUTDOWN(FreeSense),			/* PHP_MSHUTDOWN - Module shutdown */
+	PHP_RINIT(FreeSense),				/* PHP_RINIT - Request initialization */
 	NULL,							/* PHP_RSHUTDOWN - Request shutdown */
-	PHP_MINFO(pfsense),				/* PHP_MINFO - Module info */
+	PHP_MINFO(FreeSense),				/* PHP_MINFO - Module info */
 	PHP_FREESENSE_VERSION,			/* Version */
     PHP_MODULE_GLOBALS(FreeSense),  	/* Module globals */
     NULL,         		 			/* PHP_GINIT – Globals initialization */
@@ -4018,5 +4018,5 @@ zend_module_entry pfsense_module_entry = {
 # ifdef ZTS
 ZEND_TSRMLS_CACHE_DEFINE()
 # endif
-ZEND_GET_MODULE(pfsense)
+ZEND_GET_MODULE(FreeSense)
 #endif
