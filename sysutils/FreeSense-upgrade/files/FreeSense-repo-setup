@@ -37,7 +37,7 @@ _pkg() {
 }
 
 get_default_repo() {
-	local _pkg_repo_files="${PLUS_CERT_BASE}/${PRODUCT}-repo-*.name"
+	local _pkg_repo_files="${REPOS_BASE}/${PRODUCT}-repo-*.name"
 	for file in ${_pkg_repo_files}; do
 
 		repo_path="${file%.name}"
@@ -53,7 +53,7 @@ get_repo_path() {
 	local _repo_name="${1}"
 
 	# If the argument is a repo name, look for the respective repo conf path
-	for file in "${PLUS_CERT_BASE}/${PRODUCT}-repo-"*".name"; do
+	for file in "${REPOS_BASE}/${PRODUCT}-repo-"*".name"; do
 		if [ ! -f "${file}" ]; then
 			continue
 		fi
@@ -106,15 +106,15 @@ get_repoc_feat() {
 }
 
 validate_repo_conf() {
-	local default_file=$(ls -1 ${PLUS_CERT_BASE}/*.default 2>/dev/null | tail -n 1)
-	local default="${PLUS_CERT_BASE}/${PRODUCT}-repo-stable.conf"
+	local default_file=$(ls -1 ${REPOS_BASE}/*.default 2>/dev/null | tail -n 1)
+	local default="${REPOS_BASE}/${PRODUCT}-repo-stable.conf"
 	local repo_name=$(get_repo_name "${PKG_REPO_CONF_PATH}")
 	local id pkg_repo_conf
 
-	pkg_repo_conf="${PLUS_CERT_BASE}/${PRODUCT}-repo-${repo_name}.conf"
+	pkg_repo_conf="${REPOS_BASE}/${PRODUCT}-repo-${repo_name}.conf"
 	if [ ! -f "${pkg_repo_conf}" ]; then
 		repo_id="$(get_repo_id "${PKG_REPO_CONF_PATH}")"
-		pkg_repo_conf="${PLUS_CERT_BASE}/${PRODUCT}-repo-${repo_id}.conf"
+		pkg_repo_conf="${REPOS_BASE}/${PRODUCT}-repo-${repo_id}.conf"
 	fi
 
 	if [ -n "${default_file}" ] && [ -f "${default_file}" ]; then
@@ -243,15 +243,15 @@ EOF
 	fi
 
 	REPO_NAME=$(get_repo_name "${PKG_REPO_CONF_PATH}")
-	PLUS_REPO_CONF="${PLUS_CERT_BASE}/${PRODUCT}-repo-${REPO_NAME}.conf"
-	if [ ! -f "${PLUS_REPO_CONF}" ]; then
+	SELECTED_REPO_CONF="${REPOS_BASE}/${PRODUCT}-repo-${REPO_NAME}.conf"
+	if [ ! -f "${SELECTED_REPO_CONF}" ]; then
 		REPO_ID="$(get_repo_id "${PKG_REPO_CONF_PATH}")"
-		PLUS_REPO_CONF="${PLUS_CERT_BASE}/${PRODUCT}-repo-${REPO_ID}.conf"
+		SELECTED_REPO_CONF="${REPOS_BASE}/${PRODUCT}-repo-${REPO_ID}.conf"
 	fi
-	if [ -f "${PLUS_REPO_CONF}" ] && \
-	   [ "${PLUS_REPO_CONF}" != "$(realpath "${PRODUCT_REPO_CONF}")" ]; then
+	if [ -f "${SELECTED_REPO_CONF}" ] && \
+	   [ "${SELECTED_REPO_CONF}" != "$(realpath "${PRODUCT_REPO_CONF}")" ]; then
 		rm -f "${PRODUCT_REPO_CONF}"
-		ln -s "${PLUS_REPO_CONF}" "${PRODUCT_REPO_CONF}"
+		ln -s "${SELECTED_REPO_CONF}" "${PRODUCT_REPO_CONF}"
 	fi
 	err=0
 
@@ -320,7 +320,7 @@ product_repo_setup() {
 
 PHP="/usr/local/bin/php"
 READ_XML_TAG="/usr/local/sbin/read_xml_tag.sh"
-export PLUS_CERT_BASE="$("${PHP}" -n /usr/local/sbin/read_global_var pkg_repos_path FreeSense)"
+export REPOS_BASE="$("${PHP}" -n /usr/local/sbin/read_global_var pkg_repos_path FreeSense)"
 export PRODUCT="$("${PHP}" -n /usr/local/sbin/read_global_var product_name FreeSense)"
 export PRODUCT_REPO_CONF="/usr/local/etc/pkg/repos/${PRODUCT}.conf"
 export PKG_CONF="/usr/local/etc/pkg.conf"

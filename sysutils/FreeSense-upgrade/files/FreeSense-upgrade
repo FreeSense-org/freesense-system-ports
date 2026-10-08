@@ -301,11 +301,10 @@ be_is_path_on_root()
 # Test the system for boot environment support (e.g. fails on UFS systems)
 #
 # notes:
-#    1. Check if we are on Plus (UB on CE)
-#    2. Check if root is on ZFS
-#    3. Perform a sanity check using `bectl check`
-#    4. Check to see if /cf lives on the root dataset
-#    5. Check to see if /var/db/pkg lives on the root dataset
+#    1. Check if root is on ZFS
+#    2. Perform a sanity check using `bectl check`
+#    3. Check to see if /cf lives on the root dataset
+#    4. Check to see if /var/db/pkg lives on the root dataset
 #
 be_bootenv_check()
 {
