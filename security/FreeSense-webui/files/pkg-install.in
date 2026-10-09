@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+# FreeSense-webui: nginx serves /next/, /ui/ and /themes/ only while
+# %%WEBROOT%%/index.php exists (system.inc), so the WebGUI configuration is
+# regenerated after a first install. Upgrades keep it and change nothing.
+# Never inside an installer or image root (PKG_ROOTDIR set).
+
+flag=/tmp/.FreeSense-webui-new-install
+
+case "$2" in
+PRE-INSTALL)
+	rm -f "${flag}"
+	if [ -z "${PKG_ROOTDIR}" ] && [ ! -f "%%WEBROOT%%/index.php" ]; then
+		touch "${flag}"
+	fi
+	;;
+POST-INSTALL)
+	if [ -f "${flag}" ]; then
+		rm -f "${flag}"
+		if [ -x /etc/rc.restart_webgui ] && [ -f /var/run/php-fpm.pid ]; then
+			# In the background: the package manager may be running from the WebGUI.
+			(sleep 3; /etc/rc.restart_webgui) >/dev/null 2>&1 &
+		fi
+	fi
+	;;
+esac
+exit 0

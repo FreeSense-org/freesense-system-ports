@@ -32,6 +32,8 @@ jobs:
           ref: ${{ steps.source.outputs.ref }}
       - name: FreeSense-system pkg-plist matches the source tree
         run: python3 tools/system_plist_audit.py --source freesense-src
+      - name: FreeSense-webui port matches the freesense-webui commit it pins
+        run: python3 tools/webui_port_audit.py
       - name: Reject credentials
         run: |
           if git grep -IEn '(^[[:space:]]*-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----[[:space:]]*$|R2_SECRET_ACCESS_KEY[=:][[:space:]]*[^$<{])'; then

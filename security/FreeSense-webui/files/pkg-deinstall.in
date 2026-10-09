@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+# FreeSense-webui: after removal the WebGUI configuration is regenerated so
+# nginx no longer serves /next/, /ui/ and /themes/. During an upgrade the new
+# files are in place again by the time this runs late, so nothing happens.
+
+case "$2" in
+POST-DEINSTALL)
+	if [ -z "${PKG_ROOTDIR}" ] && [ -x /etc/rc.restart_webgui ] && [ -f /var/run/php-fpm.pid ]; then
+		(sleep 5; [ -f "%%WEBROOT%%/index.php" ] || /etc/rc.restart_webgui) >/dev/null 2>&1 &
+	fi
+	;;
+esac
+exit 0

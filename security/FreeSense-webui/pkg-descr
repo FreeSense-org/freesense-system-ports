@@ -1,0 +1,5 @@
+FreeSense WebUI 2.0 preview: the new API-first WebUI with themes, served
+under /next/ next to the current WebUI, which stays at /. Sign in with the
+same accounts; privileges are the same.
+
+Experimental and unsupported, like Development builds.
