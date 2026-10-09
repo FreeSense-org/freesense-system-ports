@@ -85,6 +85,7 @@
 /etc/inc/restapi/routes_status.inc
 /etc/inc/restapi/routes_system.inc
 /etc/inc/restapi/routes_unbound.inc
+/etc/inc/restapi/routes_update.inc
 /etc/inc/restapi/routes_users.inc
 /etc/inc/restapi/routes_v1.inc
 /etc/inc/restapi/schema.inc
@@ -293,6 +294,7 @@ FreeSense/include/www/system_advanced_network.inc
 FreeSense/include/www/system_advanced_notifications.inc
 FreeSense/include/www/system_advanced_sysctl.inc
 FreeSense/include/www/system_authservers.inc
+FreeSense/include/www/system_boot_environments.inc
 FreeSense/include/www/system_certificates.inc
 FreeSense/include/www/system_general.inc
 FreeSense/include/www/system_hasync.inc
