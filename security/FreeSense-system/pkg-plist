@@ -90,6 +90,8 @@
 /etc/inc/restapi/schema.inc
 /etc/inc/restapi/schemas/firewall_aliases.inc
 /etc/inc/restapi/schemas/firewall_rules.inc
+/etc/inc/restapi/schemas/firewall_schedules.inc
+/etc/inc/restapi/schemas/firewall_vips.inc
 /etc/inc/restapi/schemas/services_ntp.inc
 /etc/inc/restapi/routes_vpn.inc
 /etc/inc/restapi_listener.inc
