@@ -54,6 +54,8 @@
 /etc/inc/freesense-utils.inc
 /etc/inc/phpsessionmanager.inc
 /etc/inc/pkg-utils.inc
+/etc/inc/pkg_custom_repos.inc
+/etc/inc/pkg_custom_repos/core.inc
 /etc/inc/priv.defs.inc
 /etc/inc/priv.inc
 /etc/inc/priv/restapi.priv.inc
@@ -648,6 +650,8 @@ www/pkg_control.php
 www/pkg_mgr.php
 www/pkg_mgr_install.php
 www/pkg_mgr_installed.php
+www/pkg_mgr_repos.php
+www/pkg_mgr_repos_edit.php
 www/safari-pinned-tab.svg
 www/services_captiveportal.php
 www/services_captiveportal_filemanager.php
