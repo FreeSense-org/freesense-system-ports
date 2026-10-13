@@ -82,6 +82,7 @@
 /etc/inc/restapi/routes_openvpn.inc
 /etc/inc/restapi/routes_operations.inc
 /etc/inc/restapi/routes_packages.inc
+/etc/inc/restapi/routes_pkgrepos.inc
 /etc/inc/restapi/routes_pki.inc
 /etc/inc/restapi/routes_routing.inc
 /etc/inc/restapi/routes_services.inc
