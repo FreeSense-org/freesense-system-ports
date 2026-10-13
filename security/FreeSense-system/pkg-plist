@@ -288,6 +288,7 @@ FreeSense/include/www/interfaces_edit.inc
 FreeSense/include/www/interfaces_l2.inc
 FreeSense/include/www/interfaces_tunnels.inc
 FreeSense/include/www/pkg_mgr_install.inc
+FreeSense/include/www/pkg_mgr_sources.inc
 FreeSense/include/www/restapi_explorer.inc
 FreeSense/include/www/restapi_keys.inc
 FreeSense/include/www/restapi_listeners.inc
