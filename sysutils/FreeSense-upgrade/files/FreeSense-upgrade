@@ -2130,6 +2130,15 @@ if_pppoe_upgrade() {
 
 export LANG=C
 
+# Repositories an administrator added under Package Manager > Repositories live in
+# /usr/local/etc/pkg/custom-repos, which pkg.conf lets plain pkg read. The system
+# upgrader must only ever see the FreeSense repositories, so it can never take a
+# core package from, or be confused by, a third-party repository.
+if [ -z "${REPOS_DIR}" ] && \
+    /usr/bin/grep -qs '/usr/local/etc/pkg/custom-repos' /usr/local/etc/pkg.conf; then
+	export REPOS_DIR="/etc/pkg/,/usr/local/etc/pkg/repos/"
+fi
+
 ARCH="$(/usr/bin/uname -p)"
 pid_file="/var/run/$(basename $0).pid"
 logfile="/cf/conf/upgrade_log.txt"

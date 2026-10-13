@@ -240,6 +240,13 @@ EOF
 PKG_DBDIR=${dbdir}
 REPOS_DIR=[${reposdir}]
 EOF
+	elif [ "${PKG_CONF}" = "/usr/local/etc/pkg.conf" ]; then
+		# Let plain pkg on the shell see the repositories added under Package
+		# Manager > Repositories (a missing directory is ignored). FreeSense-upgrade
+		# and the WebUI's own package operations ignore this directory.
+		cat << EOF >> ${PKG_CONF}
+REPOS_DIR=["/etc/pkg/", "/usr/local/etc/pkg/repos/", "/usr/local/etc/pkg/custom-repos/"]
+EOF
 	fi
 
 	REPO_NAME=$(get_repo_name "${PKG_REPO_CONF_PATH}")
