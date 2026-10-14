@@ -1,5 +1,5 @@
 FreeSense
-Copyright 2026 The FreeSense contributors
+Copyright 2025-2026 The FreeSense Project
 
 This product is a derivative work of pfSense® CE.
 Portions Copyright 2004-2026 Rubicon Communications, LLC (Netgate).
@@ -31,3 +31,50 @@ Netgate. The pfSense name and marks are used here only to accurately identify th
 upstream project from which FreeSense is derived, and are not used as FreeSense's
 own branding.
 
+================================================================================
+Copyright notices in the source code
+================================================================================
+
+Every source file keeps the copyright lines of the work it is based on. The
+lines below are all the distinct copyright lines that appear in the headers of
+the files in this repository, each listed once (the year ranges differ from
+file to file). Files written for FreeSense carry only the FreeSense line.
+
+Project and upstream organizations:
+
+  Copyright (c) 2004-2026 Rubicon Communications, LLC (Netgate)
+  Copyright (c) 2008-2026 Rubicon Communications, LLC (Netgate)
+  Copyright (c) 2009-2026 Rubicon Communications, LLC (Netgate)
+  Copyright (c) 2010-2026 Rubicon Communications, LLC (Netgate)
+  Copyright (c) 2011-2026 Rubicon Communications, LLC (Netgate)
+  Copyright (c) 2014-2026 Rubicon Communications, LLC (Netgate)
+  Copyright (c) 2015-2026 Rubicon Communications, LLC (Netgate)
+  Copyright (c) 2022-2026 Rubicon Communications, LLC (Netgate)
+  Copyright (c) 2024-2026 Rubicon Communications, LLC (Netgate)
+  Copyright (c) 2025-2026 The FreeSense Project
+
+Other copyright holders of upstream code:
+
+  Copyright (c) 1982, 1986, 1990, 1993 The Regents of the University of California
+  Copyright (c) 1988, 1989, 1990, 1991, 1992, 1993, 1994 The Regents of the University of California
+  Copyright (c) 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997 The Regents of the University of California
+  Copyright (c) 1988, 1989, 1990, 1991, 1993, 1994, 1995, 1996 The Regents of the University of California
+  Copyright (c) 1983, 1993 The Regents of the University of California
+  Copyright (c) 2005 Bill Marquette
+  Copyright (c) Henning Brauer <henning@openbsd.org>
+  Copyright (c) Nils Adermann, Jordi Boggiano
+  Copyright (c) 2001 Daniel Hartmeier
+  Copyright (c) 1997 Jason R. Thorpe
+  Copyright(c) 2010 Lanner Electronics Inc
+  Copyright (c) 2003-2004 Manuel Kasper <mk@neon1.net>
+  Copyright (c) 2007 Manuel Kasper <mk@neon1.net>
+  Copyright (c) 2007 Marcel Wiget <mwiget@mac.com>
+  Copyright 2001 Niels Provos <provos@citi.umich.edu>
+  Copyright (c) 1995-1996 Open Market, Inc
+  Copyright (c) 2006 Peter Allgeyer
+  dnsmasq is Copyright (c) 2000-2007 Simon Kelley
+  Copyright (c) 2004 The FreeBSD Project
+  Copyright (c) 1999-2004 The tcpdump.org project
+  Copyright (c) 1995-1999 Whistle Communications, Inc. All rights reserved
+  Copyright (c) 1998 WIDE Project
+  Copyright (c) 2002 WIDE Project
