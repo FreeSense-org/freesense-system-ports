@@ -2,7 +2,7 @@ PORTNAME=	repoc
 PORTVERSION=	1.0.0
 # Script-only port: advance this whenever files/ changes so installed systems
 # receive the corrected repository client during an ordinary pkg upgrade.
-PORTREVISION=	6
+PORTREVISION=	7
 CATEGORIES=	sysutils
 PKGNAMEPREFIX=	FreeSense-
 MASTER_SITES=	# empty

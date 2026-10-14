@@ -295,8 +295,13 @@ product_repo_setup() {
 		_fstyle="$(get_repoc_feat | /usr/bin/grep -c "repodir-new-fstyle")"
 		[ "${?}" -eq 0 ] && [ "${_fstyle}" = "1" ] && \
 		    _repoc_args="${_repoc_args} -N"
-		# Fetch the repository settings.
-		if ! "/usr/local/sbin/${PRODUCT}-repoc-static" $_repoc_args; then
+		# Fetch the repository settings for the channel chosen in config.xml
+		# (a name such as "stable", or the path of its .conf file).
+		_selected="$("${READ_XML_TAG}" string system/pkg_repo_conf_path)"
+		_selected="${_selected##*/${PRODUCT}-repo-}"
+		_selected="${_selected%.conf}"
+		if ! FREESENSE_SELECTED_CHANNEL="${_selected}" \
+		    "/usr/local/sbin/${PRODUCT}-repoc-static" $_repoc_args; then
 			echo "failed to update the repository settings!!!"
 			rm -f "/tmp/${PRODUCT}.conf.copy"
 			exit 1
@@ -326,6 +331,9 @@ product_repo_setup() {
 #
 
 PHP="/usr/local/bin/php"
+# 1.1.1 to 1.1.4 could leave a stray "/etc/pkg/," tree: FreeSense-repoc took the
+# upgrader's comma-separated pkg REPOS_DIR as its own directory. Nothing reads it.
+[ -d "/etc/pkg/," ] && rm -rf "/etc/pkg/,"
 READ_XML_TAG="/usr/local/sbin/read_xml_tag.sh"
 export REPOS_BASE="$("${PHP}" -n /usr/local/sbin/read_global_var pkg_repos_path FreeSense)"
 export PRODUCT="$("${PHP}" -n /usr/local/sbin/read_global_var product_name FreeSense)"

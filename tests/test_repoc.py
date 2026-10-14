@@ -128,6 +128,22 @@ def v3_payload() -> dict[str, object]:
     return payload
 
 
+def stable_1_1_patch_payload() -> dict[str, object]:
+    """The live shape after Stable 1.1.4: devel (the default) still says 1.1.0."""
+    payload = v3_payload()
+    stable = complete_channel(
+        "stable", "FreeSense 1.1 Stable", "1.1", False,
+        STABLE_SYSTEM_SHA, STABLE_PACKAGES_SHA, 11, 11,
+    )
+    stable["version"] = "1.1.4"
+    stable["system"]["freebsd_pin_id"] = FREEBSD_PIN
+    stable["system"]["osversion"] = OSVERSION
+    stable["packages"]["freebsd_pin_id"] = FREEBSD_PIN
+    stable["packages"]["built_against_system"] = STABLE_SYSTEM_SHA
+    payload["channels"]["stable"] = stable
+    return payload
+
+
 def stable_complete_devel_pending_payload() -> dict[str, object]:
     devel = complete_channel("devel", "Development version", "1.1", True)
     devel.pop("packages")
@@ -287,6 +303,7 @@ class RepocSafetyTests(unittest.TestCase):
         lock_hold: float = 0,
         machine_arch: str | None = None,
         processor_arch: str | None = None,
+        extra_env: dict[str, str] | None = None,
     ) -> tuple[subprocess.CompletedProcess[str], Path, Path, Path, bytes]:
         case = self.root / name
         case.mkdir()
@@ -355,7 +372,7 @@ exec "$REAL_MV" "$@"
                 "PHP": self.php,
                 "OPENSSL": self.openssl,
                 "PRODUCT": "FreeSense",
-                "REPOS_DIR": str(repos),
+                "FREESENSE_REPOS_DIR": str(repos),
                 "SHARE_DIR": str(case / "share"),
                 "MANIFEST_LOCAL": str(local),
                 "MANIFEST_CACHE": str(cache),
@@ -371,6 +388,8 @@ exec "$REAL_MV" "$@"
                 "INSTALLED_VERSION": installed_version,
             }
         )
+        if extra_env:
+            environment.update(extra_env)
         if machine_arch is not None:
             environment["MACHINE_ARCH"] = machine_arch
         if processor_arch is not None:
@@ -797,6 +816,52 @@ exec "$REAL_MV" "$@"
             "1.1.0",
         )
         self.assertFalse((repos / "FreeSense-repo-stable.conf").exists())
+
+    def test_upgrader_pkg_environment_does_not_hide_the_selected_channel(self) -> None:
+        # FreeSense-upgrade exports pkg's REPOS_DIR (a comma list) and a short
+        # FETCH_TIMEOUT. repoc must still find the selected Stable channel in
+        # its own directory instead of falling back to the 1.1.0 default.
+        live = stable_1_1_patch_payload()
+        result, repos, cache, _, _ = self.run_repoc(
+            "upgrader-environment", live, selected="stable",
+            installed_version="1.1.3-RELEASE",
+            extra_env={
+                "REPOS_DIR": "/etc/pkg/,/usr/local/etc/pkg/repos/",
+                "FETCH_TIMEOUT": "5",
+            },
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(cache.read_bytes(), payload_bytes(live))
+        self.assertTrue((repos / "FreeSense-repo-stable.default").exists())
+        self.assertEqual(
+            (repos / "FreeSense-repo-stable.version").read_text(encoding="utf-8").strip(),
+            "1.1.4",
+        )
+        self.assertFalse((repos / "FreeSense-repo-devel.conf").exists())
+
+    def test_configured_channel_wins_over_a_stale_marker(self) -> None:
+        # A 1.1.0 system kept the marker on devel (then eligible). After the
+        # update to 1.1.3 devel (1.1.0) is not eligible any more; the channel
+        # chosen in config.xml (stable) must still be used.
+        live = stable_1_1_patch_payload()
+        result, repos, _, _, _ = self.run_repoc(
+            "stale-marker", live, selected="devel",
+            installed_version="1.1.3-RELEASE",
+            extra_env={"FREESENSE_SELECTED_CHANNEL": "stable"},
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((repos / "FreeSense-repo-stable.default").exists())
+        self.assertFalse((repos / "FreeSense-repo-devel.default").exists())
+
+    def test_an_invalid_configured_channel_is_ignored(self) -> None:
+        live = stable_1_1_patch_payload()
+        result, repos, _, _, _ = self.run_repoc(
+            "bad-configured-channel", live, selected="stable",
+            installed_version="1.1.3-RELEASE",
+            extra_env={"FREESENSE_SELECTED_CHANNEL": "../stable"},
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((repos / "FreeSense-repo-stable.default").exists())
 
     def test_v3_booted_1_0_can_select_stable_or_upgrade_to_1_1(self) -> None:
         live = v3_payload()

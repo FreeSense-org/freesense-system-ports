@@ -60,8 +60,8 @@ class RepositoryOSVersionTests(unittest.TestCase):
             ROOT / "sysutils" / "FreeSense-repoc" / "Makefile"
         ).read_text(encoding="utf-8")
 
-        self.assertRegex(upgrade_makefile, r"(?m)^PORTREVISION=\s*11$")
-        self.assertRegex(repoc_makefile, r"(?m)^PORTREVISION=\s*6$")
+        self.assertRegex(upgrade_makefile, r"(?m)^PORTREVISION=\s*12$")
+        self.assertRegex(repoc_makefile, r"(?m)^PORTREVISION=\s*7$")
 
     def test_exit_starts_services_queued_by_pkg_scripts(self) -> None:
         exit_body = UPGRADE[UPGRADE.index("_exit() {"):]
@@ -87,6 +87,34 @@ class RepositoryOSVersionTests(unittest.TestCase):
             REPO_SETUP,
         )
         self.assertIn('OSVERSION="${_repo_osversion}"', REPO_SETUP)
+
+
+class RepositorySetupEnvironmentTests(unittest.TestCase):
+    def test_repo_setup_never_inherits_the_pkg_only_settings(self) -> None:
+        # The upgrader exports REPOS_DIR (a comma list) and FETCH_TIMEOUT for
+        # pkg; FreeSense-repoc 1.0.0_6 read the same names and lost the
+        # selected channel ("still pending"), so no update could start.
+        self.assertIn(
+            "env -u REPOS_DIR -u FETCH_TIMEOUT /usr/local/sbin/${product}-repo-setup",
+            UPGRADE,
+        )
+        repoc = (
+            ROOT / "sysutils" / "FreeSense-repoc" / "files" / "FreeSense-repoc"
+        ).read_text(encoding="utf-8")
+        self.assertIn('REPOS_DIR="${FREESENSE_REPOS_DIR:-', repoc)
+        self.assertIn('FETCH_TIMEOUT="${REPOC_FETCH_TIMEOUT:-15}"', repoc)
+        self.assertNotIn('"${REPOS_DIR:-', repoc)
+
+    def test_exit_status_reaches_the_log_and_the_caller(self) -> None:
+        self.assertIn("trap '_exit $?' EXIT", UPGRADE)
+        self.assertNotIn("trap _exit 1 2 15 EXIT", UPGRADE)
+        self.assertNotIn("\ttrap - EXIT", UPGRADE)
+        setup = UPGRADE.index("-repo-setup ${dont_update}")
+        failure = UPGRADE[setup:UPGRADE.index("11)", setup)]
+        self.assertIn("_exit 1", failure)
+        self.assertNotIn("\texit 1", failure)
+        busy = UPGRADE.index("if pgrep -qF ${pid_file}")
+        self.assertIn("exit 75", UPGRADE[busy:UPGRADE.index("\nfi\n", busy)])
 
 
 if __name__ == "__main__":

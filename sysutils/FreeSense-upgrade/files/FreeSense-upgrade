@@ -2091,7 +2091,9 @@ label_esp() {
 	    cat ${tmpdir}/pre.bin ${tmpdir}/suf.bin > ${tmpdir}/boot.bin &&
 	    dd if=${tmpdir}/boot.bin of=/dev/${efipart} 2>/dev/null
 	rm -rf ${tmpdir}
-	trap - EXIT
+	# Hand EXIT back to _exit: clearing it here skipped the cleanup and
+	# the final __RC line for the rest of the run.
+	trap '_exit $?' EXIT
     fi
 }
 
@@ -2340,7 +2342,8 @@ fi
 
 if pgrep -qF ${pid_file} >/dev/null 2>&1; then
 	echo "Another instance is already running... Aborting!"
-	exit 1
+	# EX_TEMPFAIL, like the wrapper's lock: callers can tell "busy" from a failure.
+	exit 75
 fi
 
 echo $$ > ${pid_file}
@@ -2348,7 +2351,9 @@ echo $$ > ${pid_file}
 # Since this point it's safe to remove pid_file
 delete_pid=1
 
-trap _exit 1 2 15 EXIT
+# Keep the real exit status: a plain "exit 1" must not be reported as __RC=0.
+trap '_exit 1' 1 2 15
+trap '_exit $?' EXIT
 
 block_external_services=$(read_xml_tag.sh boolean \
     system/block_external_services)
@@ -2374,12 +2379,14 @@ fi
 
 unset NEW_MAJOR
 
-# Fetch the latest settings.
-/usr/local/sbin/${product}-repo-setup ${dont_update}
+# Fetch the latest settings. REPOS_DIR and FETCH_TIMEOUT above are meant for
+# pkg only; older FreeSense-repoc versions read the same names and then lose
+# the selected update channel, so never pass them on.
+env -u REPOS_DIR -u FETCH_TIMEOUT /usr/local/sbin/${product}-repo-setup ${dont_update}
 case "$?" in
 1)
-	echo "failed to update the repository settings!!!"
-	exit 1
+	_echo "ERROR: Unable to update the repository settings. Check the system log and try again."
+	_exit 1
 	;;
 11)
 	reinstall_pkg=1
