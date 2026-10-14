@@ -16,7 +16,11 @@ read_global() {
 }
 
 PRODUCT="${PRODUCT:-$(read_global product_name FreeSense)}"
-REPOS_DIR="${REPOS_DIR:-$(read_global pkg_repos_path "/usr/local/etc/${PRODUCT}/pkg/repos")}"
+# REPOS_DIR and FETCH_TIMEOUT are pkg(8) settings that FreeSense-upgrade exports
+# for pkg itself (REPOS_DIR is a comma list there). Never take them from the
+# environment: read only FreeSense-specific names, so the channel markers are
+# always found in the real repository directory.
+REPOS_DIR="${FREESENSE_REPOS_DIR:-$(read_global pkg_repos_path "/usr/local/etc/${PRODUCT}/pkg/repos")}"
 SHARE_DIR="${SHARE_DIR:-/usr/local/share/${PRODUCT}}"
 MANIFEST_URL_CONFIGURED="${MANIFEST_URL+x}"
 MACHINE_ARCH="${MACHINE_ARCH:-$(uname -m)}"
@@ -50,7 +54,7 @@ MANIFEST_LEGACY_URL="${MANIFEST_LEGACY_URL:-https://pkg.freesense.org/v1/repos.m
 MANIFEST_LOCAL="${MANIFEST_LOCAL:-${SHARE_DIR}/repos.${PACKAGE_ARCH}.manifest.json}"
 MANIFEST_CACHE="${MANIFEST_CACHE:-/cf/conf/${PRODUCT}-repos.${PACKAGE_ARCH}.manifest.json}"
 CHANNEL_KEY="${CHANNEL_KEY:-${SHARE_DIR}/keys/channel/public.pem}"
-FETCH_TIMEOUT="${FETCH_TIMEOUT:-15}"
+FETCH_TIMEOUT="${REPOC_FETCH_TIMEOUT:-15}"
 LOCK_FILE="${LOCK_FILE:-/var/run/${PRODUCT}-repoc.lock}"
 INSTALLED_VERSION_FILE="${INSTALLED_VERSION_FILE:-/etc/version}"
 INSTALLED_VERSION="${INSTALLED_VERSION:-}"
@@ -135,6 +139,13 @@ for marker in "${REPOS_DIR}/${PRODUCT}-repo-"*.default; do
 	SELECTED="${SELECTED%.default}"
 	break
 done
+# The channel chosen in the firewall's configuration (passed by repo-setup and
+# the WebUI) wins over the marker of an earlier run: that marker could still
+# name a channel that is no longer eligible, and nothing could be updated.
+case "${FREESENSE_SELECTED_CHANNEL:-}" in
+"" | *[!a-z0-9.-]* | [!a-z0-9]*) ;;
+*) SELECTED="${FREESENSE_SELECTED_CHANNEL}" ;;
+esac
 
 validate_payload() {
 	"${PHP}" -n -r '
