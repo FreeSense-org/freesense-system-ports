@@ -26,6 +26,7 @@
 /etc/inc/dyndns.class
 /etc/inc/easyrule.inc
 /etc/inc/filter.inc
+/etc/inc/fleet_node.inc
 /etc/inc/freesense-docs.inc
 /etc/inc/functions.inc
 /etc/inc/globals.inc
@@ -77,6 +78,7 @@
 /etc/inc/restapi/routes_ifconfig.inc
 /etc/inc/restapi/routes_interfaces.inc
 /etc/inc/restapi/routes_logs.inc
+/etc/inc/restapi/routes_management.inc
 /etc/inc/restapi/routes_me.inc
 /etc/inc/restapi/routes_nat.inc
 /etc/inc/restapi/routes_ntp.inc
@@ -754,6 +756,7 @@ www/system_camanager.php
 www/system_certmanager.php
 www/system_certmanager_renew.php
 www/system_crlmanager.php
+www/system_fleet.php
 www/system_gateway_groups.php
 www/system_gateway_groups_edit.php
 www/system_gateways.php
