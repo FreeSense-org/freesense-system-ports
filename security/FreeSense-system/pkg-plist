@@ -28,8 +28,10 @@
 /etc/inc/filter.inc
 /etc/inc/fleet_agent.inc
 /etc/inc/fleet_guard.inc
+/etc/inc/fleet_handoff.inc
 /etc/inc/fleet_join.inc
 /etc/inc/fleet_node.inc
+/etc/inc/fleet_seed.inc
 /etc/inc/freesense-docs.inc
 /etc/inc/functions.inc
 /etc/inc/globals.inc
