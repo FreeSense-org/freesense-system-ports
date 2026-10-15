@@ -13,3 +13,5 @@ System-only port definitions (FreeSense-system, FreeSense-upgrade, FreeSense-rep
 - Never give FreeSense tools environment variable names that pkg also reads (REPOS_DIR, FETCH_TIMEOUT); see the 1.1.1-1.1.4 updater failure.
 - The FreeSense-system pkg-plist must list every `src/` file of `freesense`; CI audits both repositories.
 - Merge with `gh pr merge --rebase` (keeps the `dev@freesense.org` author).
+- Coding style for port scripts and helpers: `freesense/docs/coding-standards.md`
+  in the `freesense` repository (shell and Python sections).
