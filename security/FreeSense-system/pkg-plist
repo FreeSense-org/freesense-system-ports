@@ -26,6 +26,7 @@
 /etc/inc/dyndns.class
 /etc/inc/easyrule.inc
 /etc/inc/filter.inc
+/etc/inc/fleet_join.inc
 /etc/inc/fleet_node.inc
 /etc/inc/freesense-docs.inc
 /etc/inc/functions.inc
