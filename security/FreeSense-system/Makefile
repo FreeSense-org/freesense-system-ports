@@ -45,7 +45,6 @@ RUN_DEPENDS=	bind-tools>=0:dns/bind-tools \
 		openvpn>=0:security/openvpn \
 		${PHP_PKGNAMEPREFIX}openssl_x509_crl>=0:security/php-openssl_x509_crl@${PHP_FLAVOR} \
 		${PHP_PKGNAMEPREFIX}pear-Auth_RADIUS>=0:net/pear-Auth_RADIUS@${PHP_FLAVOR} \
-		${PHP_PKGNAMEPREFIX}pear-Crypt_CHAP>=0:security/pear-Crypt_CHAP@${PHP_FLAVOR} \
 		${PHP_PKGNAMEPREFIX}pear-Mail>=0:mail/pear-Mail@${PHP_FLAVOR} \
 		${PHP_PKGNAMEPREFIX}pear-Net_IPv6>=0:net/pear-Net_IPv6@${PHP_FLAVOR} \
 		${PHP_PKGNAMEPREFIX}pear-XML_RPC2>=0:net/pear-XML_RPC2@${PHP_FLAVOR} \
@@ -86,7 +85,7 @@ USES=		php:flavors
 # version Mk/Uses/php.mk offers so no other flavor can be selected.
 IGNORE_WITH_PHP=	82 83 84 86
 USE_PHP=	bz2 bcmath ctype curl dom filter gettext gmp intl json mbstring \
-		mcrypt opcache openssl pcntl pdo pdo_sqlite posix \
+		opcache openssl pcntl pdo pdo_sqlite posix \
 		radius readline session shmop simplexml sockets sysvmsg sysvsem \
 		sysvshm sqlite3 tokenizer xml ldap zlib xmlreader xmlwriter
 
