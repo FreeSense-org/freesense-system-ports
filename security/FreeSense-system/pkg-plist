@@ -61,6 +61,7 @@
 /etc/inc/priv/restapi.priv.inc
 /etc/inc/priv/user.priv.inc
 /etc/inc/r53.class
+/etc/inc/radius_chap.inc
 /etc/inc/remote_backup.inc
 /etc/inc/remote_backup/s3.inc
 /etc/inc/remote_backup/sftp.inc
