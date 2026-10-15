@@ -818,7 +818,6 @@ www/vendor/jquery-treegrid/img/collapse.png
 www/vendor/jquery-treegrid/img/expand.png
 www/vendor/jquery-treegrid/img/file.png
 www/vendor/jquery-treegrid/img/folder.png
-www/vendor/jquery-treegrid/js/jquery.cookie.js
 www/vendor/jquery-treegrid/js/jquery.treegrid.bootstrap2.js
 www/vendor/jquery-treegrid/js/jquery.treegrid.bootstrap3.js
 www/vendor/jquery-treegrid/js/jquery.treegrid.js
