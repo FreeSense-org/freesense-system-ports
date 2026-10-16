@@ -507,6 +507,43 @@ class CloudInitAdapterTests(unittest.TestCase):
                 1,
             )
 
+    def test_apply_writes_a_fleet_seed_once_and_never_after_joining(self):
+        seed = {"version": 1, "mode": "unattended", "link": "https://100.64.0.1:8443/fleet/join#x", "key": "FLT-TEST"}
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory, "config.xml")
+            state = Path(directory, "instance.json")
+            config.write_text(BASE_XML, encoding="utf-8")
+            meta = {
+                "schema_version": "freesense.cloud-metadata/v1",
+                "instance_id": "fleet-seed-i-1",
+                "ssh_authorized_keys": [],
+                "network": {},
+                "freesense": {"fleet": seed},
+            }
+            CLOUD.apply(meta, [{"name": "vtnet0", "mac": "02:00:00:00:00:01"}], config, state)
+            written = Path(directory, "fleet-seed.json")
+            self.assertEqual(json.loads(written.read_text(encoding="utf-8")), seed)
+            self.assertEqual(written.stat().st_mode & 0o777, 0o600)
+            written.unlink()
+            # Joined since: the configuration has a Fleet node id, so no seed comes back.
+            tree = ET.parse(config)
+            fleet = ET.SubElement(tree.getroot(), "fleet")
+            ET.SubElement(fleet, "node_id").text = "node-0123456789abcdef"
+            tree.write(config)
+            CLOUD.apply({**meta, "instance_id": "fleet-seed-i-2"}, [{"name": "vtnet0", "mac": "02:00:00:00:00:01"}], config, state)
+            self.assertFalse(written.exists())
+
+    def test_apply_rejects_a_fleet_value_that_is_not_a_seed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory, "config.xml")
+            config.write_text(BASE_XML, encoding="utf-8")
+            for bad in ("join-me", {"version": 1, "mode": "attended", "link": "http://plain"}, {"version": 2, "mode": "pin", "link": "https://x"}):
+                with self.assertRaises(CLOUD.InvalidMetadata):
+                    CLOUD.apply(
+                        {"schema_version": "freesense.cloud-metadata/v1", "instance_id": "bad-fleet", "ssh_authorized_keys": [], "network": {},
+                         "freesense": {"fleet": bad}},
+                        [{"name": "vtnet0", "mac": "02:00:00:00:00:01"}], config, Path(directory, "instance.json"))
+
     def test_apply_rejects_cloud_config_keys_that_fail_to_import(self):
         with tempfile.TemporaryDirectory() as directory:
             config = Path(directory, "config.xml")

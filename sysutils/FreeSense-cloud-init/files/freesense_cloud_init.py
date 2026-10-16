@@ -26,6 +26,9 @@ DEFAULT_STATE = Path("/var/db/freesense-cloud-init/instance.json")
 DEFAULT_USER_DATA = Path("/var/lib/cloud/instance/user-data.txt")
 DEFAULT_NETWORK_CONFIG_JSON = Path("/var/lib/cloud/instance/network-config.json")
 DEFAULT_NETWORK_CONFIG = Path("/var/lib/cloud/instance/network-config")
+# Where FreeSense first boot looks for a Fleet join seed (fleet_seed.inc FLEET_SEED_FILE).
+DEFAULT_FLEET_SEED = Path("/conf/fleet/seed.json")
+FLEET_SEED_MODES = ("attended", "pin", "unattended")
 REDACTED_USERDATA = frozenset({"redacted", "none", "null"})
 CLOUD_CONFIG_KEYS = ("hostname", "fqdn", "timezone", "ssh_authorized_keys", "freesense")
 SSH_AUTHORIZED_KEYS_MARK = re.compile(r"(?m)^\s*ssh_authorized_keys\s*:")
@@ -531,6 +534,15 @@ def apply(metadata: dict, detected: list[dict], config_path: Path, state_path: P
         extension = {}
     if not isinstance(extension, dict):
         raise InvalidMetadata("freesense extension must be an object")
+    fleet = extension.get("fleet")
+    if fleet is not None and not (
+        isinstance(fleet, dict)
+        and fleet.get("version") == 1
+        and fleet.get("mode") in FLEET_SEED_MODES
+        and isinstance(fleet.get("link"), str)
+        and fleet["link"].startswith("https://")
+    ):
+        raise InvalidMetadata("freesense.fleet must be a FreeSense Fleet join seed (version 1, mode, https link)")
     cidrs = extension.get("management_cidrs", [])
     if not isinstance(cidrs, list):
         raise InvalidMetadata("management_cidrs must be an array")
@@ -671,6 +683,16 @@ def apply(metadata: dict, detected: list[dict], config_path: Path, state_path: P
         os.replace(key_temp, authorized_keys_path)
     else:
         authorized_keys_path.unlink(missing_ok=True)
+    # A FreeSense Fleet join seed: first boot joins with it (FreeSense checks it
+    # fully). Not again once the firewall has joined, so a re-apply never brings
+    # a used join key back.
+    if fleet is not None and root.findtext("fleet/node_id") in (None, ""):
+        seed_path = DEFAULT_FLEET_SEED if config_path == DEFAULT_CONFIG else config_path.parent / "fleet-seed.json"
+        seed_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        seed_temp = seed_path.with_suffix(".tmp")
+        seed_temp.write_text(json.dumps(fleet, sort_keys=True) + "\n", encoding="utf-8")
+        seed_temp.chmod(0o600)
+        os.replace(seed_temp, seed_path)
     state_temp = state_path.with_suffix(".tmp")
     state_temp.write_text(
         json.dumps(
