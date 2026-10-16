@@ -337,6 +337,7 @@ pkg/miniupnpd.xml
 @(,,755) sbin/athctrl.sh
 @(,,755) sbin/cleargmirror.sh
 @(,,755) sbin/cleargpt.sh
+@(,,755) sbin/freesense-fleet-endpoints
 @(,,755) sbin/freesense-fleet-watchdog
 @(,,755) sbin/freesense-join
 @(,,755) sbin/freesense-remote-backup
