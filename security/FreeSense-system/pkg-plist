@@ -26,6 +26,7 @@
 /etc/inc/dyndns.class
 /etc/inc/easyrule.inc
 /etc/inc/filter.inc
+/etc/inc/fleet_accounts.inc
 /etc/inc/fleet_agent.inc
 /etc/inc/fleet_guard.inc
 /etc/inc/fleet_handoff.inc
