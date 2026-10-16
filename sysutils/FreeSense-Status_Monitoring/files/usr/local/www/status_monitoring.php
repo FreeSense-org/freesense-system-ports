@@ -110,7 +110,7 @@ if(!empty($_POST['view-title'])) {
 }
 
 $changedesc = gettext("Status: Monitoring:") . " ";
-if($_POST['enable']) {
+if (!empty($_POST['enable'])) {
 	if ($read_only) {
 		$savemsg = "Insufficient privileges to make the requested change (read only).";
 		$saveclass = 'danger';
@@ -130,7 +130,7 @@ if($_POST['enable']) {
 	}
 }
 
-if ($_POST['ResetRRD']) {
+if (!empty($_POST['ResetRRD'])) {
 	if ($read_only) {
 		$savemsg = "Insufficient privileges to make the requested change (read only).";
 		$saveclass = 'danger';
@@ -150,7 +150,7 @@ if(strpos(config_get_path('rrd/category', ""), '&resolution') === false) {
 }
 
 //save settings for current view
-if ($_POST['save-view']) {
+if (!empty($_POST['save-view'])) {
 
 	$title = $view_title;
 
@@ -173,7 +173,7 @@ if ($_POST['save-view']) {
 }
 
 //add a new view and make sure the string isn't empty
-if ($_POST['add-view'] && !empty($view_title) && strtolower($view_title) != "default") {
+if (!empty($_POST['add-view']) && !empty($view_title) && strtolower($view_title) != "default") {
 	$title = $view_title;
 	$values = status_monitoring_category_from_post();
 	$key = "view" . count(config_get_path('rrd/savedviews', []));
@@ -185,7 +185,7 @@ if ($_POST['add-view'] && !empty($view_title) && strtolower($view_title) != "def
 $view_removed = false;
 
 //remove current view
-if ($_POST['remove-view']) {
+if (!empty($_POST['remove-view'])) {
 
 	if (strtolower($view_title) == "default") {
 		$savemsg = "Can't remove default view.";
@@ -392,7 +392,7 @@ $pgtitle = array(gettext("Status"), gettext("Monitoring"));
 
 include("head.inc");
 
-if ($savemsg) {
+if (!empty($savemsg)) {
 	print_info_box($savemsg, $saveclass);
 }
 
