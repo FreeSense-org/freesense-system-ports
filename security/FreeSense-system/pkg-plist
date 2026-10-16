@@ -140,6 +140,7 @@
 /etc/inc/xmlparse.inc
 /etc/inc/xmlparse_attr.inc
 /etc/inc/xmlrpc_client.inc
+/etc/inc/xmlrpc_pinned_request.inc
 /etc/FreeSense-ddb.conf
 /etc/FreeSense-devd.conf
 /etc/FreeSense-rc
