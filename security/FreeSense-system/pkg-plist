@@ -652,6 +652,7 @@ www/interfaces_wireless.php
 www/interfaces_wireless_edit.php
 www/js/FreeSense.js
 www/js/FreeSenseHelpers.js
+www/js/fleet-join.js
 www/js/freesense-bs5-compat.js
 www/js/freesense-ui.js
 www/js/jquery-cookie-shim.js
