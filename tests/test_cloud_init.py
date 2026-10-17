@@ -507,6 +507,45 @@ class CloudInitAdapterTests(unittest.TestCase):
                 1,
             )
 
+    def test_reapply_keeps_a_password_the_administrator_set(self):
+        key = self._cloud_config_key()
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory, "config.xml")
+            state = Path(directory, "instance.json")
+            config.write_text(BASE_XML, encoding="utf-8")
+            nic = [{"name": "vtnet0", "mac": "02:00:00:00:00:01"}]
+            empty = {
+                "schema_version": "freesense.cloud-metadata/v1",
+                "instance_id": "keep-pw-1",
+                "ssh_authorized_keys": [],
+                "network": {},
+                "freesense": {},
+            }
+            self.assertTrue(CLOUD.apply(empty, nic, config, state))
+            self.assertEqual(ET.parse(config).getroot().findtext("system/user/password"), "*LOCKED*")
+            # The administrator sets a password in the WebUI.
+            tree = ET.parse(config)
+            admin = tree.getroot().find("system/user")
+            admin.remove(admin.find("password"))
+            ET.SubElement(admin, "bcrypt-hash").text = "$2y$10$chosenbytheadmin"
+            tree.write(config, encoding="utf-8", xml_declaration=True)
+            # Keys arrive late: the re-apply adds them but keeps the password.
+            with_keys = {
+                **empty,
+                "ssh_authorized_keys": [key],
+                "freesense": {"management_cidrs": ["10.0.2.2/32"]},
+                "_freesense_raw_user_data": self._cloud_config_text(key),
+            }
+            self.assertTrue(CLOUD.apply(with_keys, nic, config, state))
+            admin = ET.parse(config).getroot().find("system/user")
+            self.assertEqual(admin.findtext("bcrypt-hash"), "$2y$10$chosenbytheadmin")
+            self.assertIsNone(admin.find("password"))
+            self.assertIsNotNone(admin.findtext("authorizedkeys"))
+            # A configuration without this instance (the image's own) is locked again.
+            config.write_text(BASE_XML, encoding="utf-8")
+            self.assertTrue(CLOUD.apply(with_keys, nic, config, state))
+            self.assertEqual(ET.parse(config).getroot().findtext("system/user/password"), "*LOCKED*")
+
     def test_apply_writes_a_fleet_seed_once_and_never_after_joining(self):
         seed = {"version": 1, "mode": "unattended", "link": "https://100.64.0.1:8443/fleet/join#x", "key": "FLT-TEST"}
         with tempfile.TemporaryDirectory() as directory:
