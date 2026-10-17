@@ -480,6 +480,14 @@ def configured_instance_id(config_path: Path) -> str | None:
         return None
 
 
+def applied_before(state_path: Path, instance_id: str) -> bool:
+    """True when this instance was already provisioned on this disk."""
+    try:
+        return load_json(state_path).get("instance_id") == instance_id
+    except (InvalidMetadata, json.JSONDecodeError, OSError):
+        return False
+
+
 def should_skip_apply(
     state_path: Path,
     config_path: Path,
@@ -589,10 +597,17 @@ def apply(metadata: dict, detected: list[dict], config_path: Path, state_path: P
     admin = next((user for user in users if user.findtext("name") == "admin"), None)
     if admin is None:
         raise InvalidMetadata("config.xml has no admin account")
-    old_hash = admin.find("bcrypt-hash")
-    if old_hash is not None:
-        admin.remove(old_hash)
-    set_text(admin, "password", "*LOCKED*")
+    # Lock the image's default password only when this configuration was not
+    # provisioned for this instance yet. A re-apply (keys or CIDRs that arrived
+    # late) must not wipe a password the administrator has set since; a
+    # configuration without the instance (a boot environment rollback to the
+    # image's own one) is still locked.
+    if not (applied_before(state_path, instance_id) and configured_instance_id(config_path) == instance_id):
+        for field in ("bcrypt-hash", "sha512-hash", "md5-hash"):
+            old_hash = admin.find(field)
+            if old_hash is not None:
+                admin.remove(old_hash)
+        set_text(admin, "password", "*LOCKED*")
     if keys:
         set_text(admin, "authorizedkeys", base64.b64encode(("\n".join(keys) + "\n").encode()).decode())
         ssh = child(system, "ssh")
