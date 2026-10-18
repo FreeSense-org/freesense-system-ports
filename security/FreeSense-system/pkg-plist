@@ -30,6 +30,7 @@
 /etc/inc/fleet_paths.inc
 /etc/inc/fleet_agent.inc
 /etc/inc/fleet_guard.inc
+/etc/inc/fleet_halink.inc
 /etc/inc/fleet_handoff.inc
 /etc/inc/fleet_join.inc
 /etc/inc/fleet_node.inc
