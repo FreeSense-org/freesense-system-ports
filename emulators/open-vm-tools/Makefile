@@ -56,9 +56,14 @@ PORTDOCS=	*
 
 OPTIONS_DEFINE=	DOCS DEPLOYPKG FUSE LIBNOTIFY OPENSSL X11
 OPTIONS_DEFAULT=DOCS FUSE LIBNOTIFY OPENSSL X11
-.if ${FLAVOR:U} == nox11
-OPTIONS_EXCLUDE:=	LIBNOTIFY X11
-.endif
+# FreeSense: LIBNOTIFY and X11 are excluded for every flavor, not only nox11.
+# Poudriere compares a package's recorded options with the ones it works out
+# for the port without a flavor in mind; a flavor-only exclusion made the two
+# differ, so each build deleted the existing open-vm-tools-nox11 as "changed
+# options" and rebuilt it. With the System repository and the Optional
+# repository both carrying this package, the two rebuilds are not byte for byte
+# the same and the repository merge fails. Only nox11 is ever built here.
+OPTIONS_EXCLUDE=	LIBNOTIFY X11
 OPTIONS_SUB=
 
 DEPLOYPKG_DESC=		DeployPkg plugin
