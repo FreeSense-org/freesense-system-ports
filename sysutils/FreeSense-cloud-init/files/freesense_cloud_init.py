@@ -773,6 +773,21 @@ def run_cloud_init_modules() -> int:
     return 0
 
 
+def start_guest_tools() -> None:
+    """Start the guest tools the cloud image carries.
+
+    The QEMU guest agent always; the VMware tools only on VMware, where
+    vmware-checkvm succeeds (it fails everywhere else, so nothing is started
+    and nothing is printed on a QEMU or cloud host).
+    """
+    subprocess.run(["service", "qemu-guest-agent", "onestart"], check=False)
+    probe = subprocess.run(
+        ["/usr/local/bin/vmware-checkvm"], check=False, capture_output=True
+    )
+    if probe.returncode == 0:
+        subprocess.run(["service", "vmware-guestd", "onestart"], check=False)
+
+
 def activate_cloud_runtime() -> None:
     """Apply late key/CIDR imports to the live filter and SSH service.
 
@@ -847,7 +862,7 @@ def main() -> int:
             print(f"freesense-cloud-init: {error}", file=os.sys.stderr)
             return 1
         finally:
-            subprocess.run(["service", "qemu-guest-agent", "onestart"], check=False)
+            start_guest_tools()
         return 0
     try:
         provision(

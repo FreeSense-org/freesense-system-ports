@@ -39,7 +39,7 @@ class CloudInitAdapterTests(unittest.TestCase):
     def test_wrapper_uses_ports_selected_python(self):
         makefile = PORT_MAKEFILE.read_text(encoding="utf-8")
         wrapper = WRAPPER_TEMPLATE.read_text(encoding="utf-8")
-        self.assertIn("PORTREVISION=\t15", makefile)
+        self.assertIn("PORTREVISION=\t16", makefile)
         self.assertIn("SUB_FILES=\tfreesense-cloud-init", makefile)
         self.assertIn("SUB_LIST=\tPYTHON_CMD=${PYTHON_CMD}", makefile)
         self.assertIn("${WRKDIR}/freesense-cloud-init", makefile)
@@ -58,6 +58,23 @@ class CloudInitAdapterTests(unittest.TestCase):
             module,
         )
         self.assertNotIn('["service", "qemu_guest_agent", "onestart"]', module)
+
+    def test_vmware_tools_start_only_on_vmware(self):
+        for vmware, expected in ((0, True), (1, False)):
+            runs: list[list[str]] = []
+
+            def record(cmd, check=False, **_kwargs):
+                runs.append(list(cmd))
+                code = vmware if cmd[0] == "/usr/local/bin/vmware-checkvm" else 0
+                return mock.Mock(returncode=code)
+
+            with mock.patch.object(CLOUD.subprocess, "run", side_effect=record):
+                CLOUD.start_guest_tools()
+            self.assertEqual(runs[0], ["service", "qemu-guest-agent", "onestart"])
+            self.assertIn(["/usr/local/bin/vmware-checkvm"], runs)
+            self.assertEqual(
+                ["service", "vmware-guestd", "onestart"] in runs, expected
+            )
 
     def test_final_phase_reapplies_after_full_cloud_init(self):
         key = self._cloud_config_key()
