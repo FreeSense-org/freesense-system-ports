@@ -132,6 +132,7 @@
 /etc/inc/unbound.inc
 /etc/inc/upgrade_config.inc
 /etc/inc/util.inc
+/etc/inc/validate.inc
 /etc/inc/voucher.inc
 /etc/inc/vpn.inc
 /etc/inc/vxlan.inc
