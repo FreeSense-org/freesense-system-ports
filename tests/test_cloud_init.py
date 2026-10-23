@@ -39,7 +39,7 @@ class CloudInitAdapterTests(unittest.TestCase):
     def test_wrapper_uses_ports_selected_python(self):
         makefile = PORT_MAKEFILE.read_text(encoding="utf-8")
         wrapper = WRAPPER_TEMPLATE.read_text(encoding="utf-8")
-        self.assertIn("PORTREVISION=\t14", makefile)
+        self.assertIn("PORTREVISION=\t15", makefile)
         self.assertIn("SUB_FILES=\tfreesense-cloud-init", makefile)
         self.assertIn("SUB_LIST=\tPYTHON_CMD=${PYTHON_CMD}", makefile)
         self.assertIn("${WRKDIR}/freesense-cloud-init", makefile)
@@ -57,7 +57,54 @@ class CloudInitAdapterTests(unittest.TestCase):
             'subprocess.run(["service", "qemu-guest-agent", "onestart"], check=False)',
             module,
         )
+        self.assertIn(
+            'subprocess.run(["service", "vmware-guestd", "onestart"], check=False)',
+            module,
+        )
         self.assertNotIn('["service", "qemu_guest_agent", "onestart"]', module)
+
+    def test_guest_tools_follow_the_detected_hypervisor(self):
+        # (kern.vm_guest, sysctl rc, vmware-checkvm rc) -> started services
+        qga = ["service", "qemu-guest-agent", "onestart"]
+        vmware = ["service", "vmware-guestd", "onestart"]
+        checkvm = ["/usr/local/bin/vmware-checkvm"]
+        cases = (
+            ("vmware", 0, 1, [vmware], False),
+            ("kvm", 0, 0, [qga], False),
+            ("bhyve", 0, 0, [qga], False),
+            ("none", 0, 0, [qga], False),
+            ("generic", 0, 0, [vmware], True),
+            ("generic", 0, 1, [qga], True),
+            ("", 1, 0, [vmware], True),
+            ("", 1, 1, [qga], True),
+        )
+        for guest, sysctl_rc, checkvm_rc, expected, probed in cases:
+            with self.subTest(guest=guest, sysctl_rc=sysctl_rc, checkvm_rc=checkvm_rc):
+                runs: list[list[str]] = []
+
+                def record(cmd, check=False, **_kwargs):
+                    runs.append(list(cmd))
+                    if cmd[0] == "sysctl":
+                        return mock.Mock(returncode=sysctl_rc, stdout=f"{guest}\n")
+                    if cmd == checkvm:
+                        return mock.Mock(returncode=checkvm_rc)
+                    return mock.Mock(returncode=0)
+
+                with mock.patch.object(CLOUD.subprocess, "run", side_effect=record):
+                    CLOUD.start_guest_tools()
+                self.assertEqual(runs[0], ["sysctl", "-n", "kern.vm_guest"])
+                self.assertEqual(checkvm in runs, probed)
+                self.assertEqual(
+                    [cmd for cmd in runs if cmd[0] == "service"], expected
+                )
+
+    def test_hypervisor_detection_tolerates_a_missing_sysctl(self):
+        with mock.patch.object(CLOUD.subprocess, "run", side_effect=OSError):
+            self.assertEqual(CLOUD.detect_hypervisor(), "")
+        with mock.patch.object(
+            CLOUD.subprocess, "run", return_value=mock.Mock(returncode=0, stdout=b"kvm")
+        ):
+            self.assertEqual(CLOUD.detect_hypervisor(), "")
 
     def test_final_phase_reapplies_after_full_cloud_init(self):
         key = self._cloud_config_key()
@@ -91,7 +138,7 @@ class CloudInitAdapterTests(unittest.TestCase):
 
             def record(cmd, check=False, **_kwargs):
                 runs.append(list(cmd))
-                return mock.Mock(returncode=0)
+                return mock.Mock(returncode=0, stdout="kvm\n")
 
             with (
                 mock.patch.object(CLOUD.subprocess, "run", side_effect=record),
@@ -151,7 +198,7 @@ class CloudInitAdapterTests(unittest.TestCase):
 
         def record(cmd, check=False, **_kwargs):
             runs.append(list(cmd))
-            return mock.Mock(returncode=next(statuses, 0))
+            return mock.Mock(returncode=next(statuses, 0), stdout="kvm\n")
 
         with (
             mock.patch.object(CLOUD.subprocess, "run", side_effect=record),
@@ -168,7 +215,9 @@ class CloudInitAdapterTests(unittest.TestCase):
 
         def record(cmd, check=False, **_kwargs):
             runs.append(list(cmd))
-            return mock.Mock(returncode=1)
+            # Every command fails, the hypervisor probe included: the agent
+            # must still be started after a fatal cloud-init error.
+            return mock.Mock(returncode=1, stdout="")
 
         with (
             mock.patch.object(CLOUD.subprocess, "run", side_effect=record),
