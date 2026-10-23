@@ -773,19 +773,46 @@ def run_cloud_init_modules() -> int:
     return 0
 
 
-def start_guest_tools() -> None:
-    """Start the guest tools the cloud image carries.
+def detect_hypervisor() -> str:
+    """Return the kernel's hypervisor name (kern.vm_guest), or "" when unknown.
 
-    The QEMU guest agent always; the VMware tools only on VMware, where
-    vmware-checkvm succeeds (it fails everywhere else, so nothing is started
-    and nothing is printed on a QEMU or cloud host).
+    FreeBSD reports vmware, kvm, bhyve, xen, hv, vbox, parallels, generic (an
+    unrecognised hypervisor) or none (bare metal).
     """
-    subprocess.run(["service", "qemu-guest-agent", "onestart"], check=False)
+    try:
+        probe = subprocess.run(
+            ["sysctl", "-n", "kern.vm_guest"],
+            check=False, capture_output=True, text=True,
+        )
+    except OSError:
+        return ""
+    if probe.returncode != 0 or not isinstance(probe.stdout, str):
+        return ""
+    return probe.stdout.strip()
+
+
+def running_on_vmware() -> bool:
+    """True on VMware; vmware-checkvm decides when the kernel is not sure."""
+    guest = detect_hypervisor()
+    if guest and guest != "generic":
+        return guest == "vmware"
     probe = subprocess.run(
         ["/usr/local/bin/vmware-checkvm"], check=False, capture_output=True
     )
-    if probe.returncode == 0:
+    return probe.returncode == 0
+
+
+def start_guest_tools() -> None:
+    """Start the guest tool that matches the hypervisor the image runs on.
+
+    The VMware tools on VMware; the QEMU guest agent everywhere else (KVM,
+    bhyve and the hosts that cannot be told apart). Only one of them has a
+    channel to the host, so starting the other would only log a failure.
+    """
+    if running_on_vmware():
         subprocess.run(["service", "vmware-guestd", "onestart"], check=False)
+        return
+    subprocess.run(["service", "qemu-guest-agent", "onestart"], check=False)
 
 
 def activate_cloud_runtime() -> None:
