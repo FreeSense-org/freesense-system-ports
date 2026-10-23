@@ -39,7 +39,7 @@ class CloudInitAdapterTests(unittest.TestCase):
     def test_wrapper_uses_ports_selected_python(self):
         makefile = PORT_MAKEFILE.read_text(encoding="utf-8")
         wrapper = WRAPPER_TEMPLATE.read_text(encoding="utf-8")
-        self.assertIn("PORTREVISION=\t15", makefile)
+        self.assertIn("PORTREVISION=	16", makefile)
         self.assertIn("SUB_FILES=\tfreesense-cloud-init", makefile)
         self.assertIn("SUB_LIST=\tPYTHON_CMD=${PYTHON_CMD}", makefile)
         self.assertIn("${WRKDIR}/freesense-cloud-init", makefile)
@@ -300,6 +300,33 @@ class CloudInitAdapterTests(unittest.TestCase):
         for raw, expected in variants:
             with self.subTest(raw=raw):
                 self.assertEqual(CLOUD.normalize(raw)["hostname"], expected)
+
+    def test_normalize_keeps_the_domain_of_a_nocloud_local_hostname(self):
+        # cloud-init query cuts local_hostname at the first dot; the datasource
+        # value keeps the domain and must win.
+        raw = {
+            "local_hostname": "edge-1",
+            "v1": {"local_hostname": "edge-1"},
+            "ds": {"meta_data": {"local-hostname": "edge-1.example.test"}},
+        }
+        self.assertEqual(CLOUD.normalize(raw)["hostname"], "edge-1.example.test")
+        # An explicit cloud-config fqdn still comes first.
+        self.assertEqual(
+            CLOUD.normalize({**raw, "fqdn": "fw.example.net"})["hostname"],
+            "fw.example.net",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            config = Path(directory, "config.xml")
+            config.write_text(BASE_XML, encoding="utf-8")
+            CLOUD.apply(
+                {**CLOUD.normalize(raw), "instance_id": "domain-i-1"},
+                [{"name": "vtnet0", "mac": "02:00:00:00:00:01"}],
+                config,
+                Path(directory, "instance.json"),
+            )
+            root = ET.parse(config).getroot()
+            self.assertEqual(root.findtext("system/hostname"), "edge-1")
+            self.assertEqual(root.findtext("system/domain"), "example.test")
 
     def _cloud_config_key(self):
         return (
