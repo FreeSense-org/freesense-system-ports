@@ -200,14 +200,17 @@ def normalize(raw: dict) -> dict:
     normalized = {
         "schema_version": "freesense.cloud-metadata/v1",
         "instance_id": raw.get("instance_id") or meta.get("instance-id") or meta.get("uuid"),
+        # The datasource's own value (ds.meta_data) comes before cloud-init's
+        # top-level and v1 views, which hold the name cut at the first dot and
+        # would lose the domain.
         "hostname": (
             raw.get("fqdn")
             or raw.get("hostname")
-            or raw.get("local_hostname")
-            or raw.get("local-hostname")
+            or meta.get("local-hostname")
             or meta.get("hostname")
             or meta.get("local_hostname")
-            or meta.get("local-hostname")
+            or raw.get("local_hostname")
+            or raw.get("local-hostname")
             or v1.get("hostname")
             or v1.get("local_hostname")
             or v1.get("local-hostname")
