@@ -15,6 +15,7 @@
 /etc/inc/authgui.inc
 /etc/inc/captiveportal.inc
 /etc/inc/certs.inc
+/etc/inc/cfg_format.inc
 /etc/inc/config.console.inc
 /etc/inc/config.gui.inc
 /etc/inc/config.inc
@@ -40,6 +41,8 @@
 /etc/inc/globals.inc
 /etc/inc/gmirror.inc
 /etc/inc/gwlb.inc
+/etc/inc/input_check.inc
+/etc/inc/input_gate.inc
 /etc/inc/interfaces.inc
 /etc/inc/interfaces_fast.inc
 /etc/inc/ipsec.attributes.php
@@ -789,7 +792,6 @@ www/system_usermanager_addprivs.php
 www/system_usermanager_passwordmg.php
 www/system_usermanager_settings.php
 www/upgrnotice.inc
-www/uploadconfig.php
 www/vendor/bootstrap/css/bootstrap.min.css
 www/vendor/bootstrap/js/bootstrap.bundle.min.js
 www/vendor/d3/d3.min.js
