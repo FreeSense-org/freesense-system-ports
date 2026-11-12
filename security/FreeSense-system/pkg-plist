@@ -94,6 +94,7 @@
 /etc/inc/restapi/routes_management.inc
 /etc/inc/restapi/routes_me.inc
 /etc/inc/restapi/routes_nat.inc
+/etc/inc/restapi/routes_nicsettings.inc
 /etc/inc/restapi/routes_ntp.inc
 /etc/inc/restapi/routes_openvpn.inc
 /etc/inc/restapi/routes_operations.inc
@@ -303,6 +304,7 @@ FreeSense/include/www/firewall_virtual_ip.inc
 FreeSense/include/www/interfaces_assign.inc
 FreeSense/include/www/interfaces_edit.inc
 FreeSense/include/www/interfaces_l2.inc
+FreeSense/include/www/interfaces_nic_settings.inc
 FreeSense/include/www/interfaces_tunnels.inc
 FreeSense/include/www/pkg_mgr_install.inc
 FreeSense/include/www/pkg_mgr_sources.inc
