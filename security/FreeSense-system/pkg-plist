@@ -52,6 +52,7 @@
 /etc/inc/led.inc
 /etc/inc/live_logs.inc
 /etc/inc/meta.inc
+/etc/inc/netperf.inc
 /etc/inc/nic_tuning.inc
 /etc/inc/notices.inc
 /etc/inc/openvpn.attributes.php
@@ -325,6 +326,7 @@ FreeSense/include/www/system_advanced_firewall.inc
 FreeSense/include/www/system_advanced_misc.inc
 FreeSense/include/www/system_advanced_network.inc
 FreeSense/include/www/system_advanced_notifications.inc
+FreeSense/include/www/system_advanced_performance.inc
 FreeSense/include/www/system_advanced_sysctl.inc
 FreeSense/include/www/system_authservers.inc
 FreeSense/include/www/system_boot_environments.inc
@@ -766,6 +768,7 @@ www/system_advanced_firewall.php
 www/system_advanced_misc.php
 www/system_advanced_network.php
 www/system_advanced_notifications.php
+www/system_advanced_performance.php
 www/system_advanced_sysctl.php
 www/system_authservers.php
 www/system_boot_environments.php
