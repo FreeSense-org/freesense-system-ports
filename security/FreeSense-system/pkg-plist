@@ -52,6 +52,7 @@
 /etc/inc/led.inc
 /etc/inc/live_logs.inc
 /etc/inc/meta.inc
+/etc/inc/nic_tuning.inc
 /etc/inc/notices.inc
 /etc/inc/openvpn.attributes.php
 /etc/inc/openvpn.auth-user.php
