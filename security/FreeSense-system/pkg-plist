@@ -504,6 +504,7 @@ share/locale/zh_TW/LC_MESSAGES/FreeSense.po
 %%DATADIR%%/ssl/openssl.cnf
 www/404.html
 www/50x.html
+www/account.php
 www/android-chrome-192x192.png
 www/android-chrome-512x512.png
 www/api/index.php
@@ -789,7 +790,6 @@ www/system_restapi_keys.php
 www/system_routes.php
 www/system_routes_edit.php
 www/system_update_settings.php
-www/system_user_settings.php
 www/system_usermanager.php
 www/system_usermanager_addprivs.php
 www/system_usermanager_passwordmg.php
