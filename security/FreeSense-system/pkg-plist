@@ -289,6 +289,7 @@ FreeSense/include/Services/Filesystem/Provider/SystemProvider.php
 FreeSense/include/www/alias-utils.inc
 FreeSense/include/www/backup.inc
 FreeSense/include/www/bandwidth_by_ip.inc
+FreeSense/include/www/dashboard.inc
 FreeSense/include/www/diag_arp.inc
 FreeSense/include/www/diag_dump_states.inc
 FreeSense/include/www/diag_ndp.inc
@@ -352,6 +353,7 @@ pkg/miniupnpd.xml
 @(,,755) sbin/freesense-join
 @(,,755) sbin/freesense-remote-backup
 @(,,755) sbin/freesense-restapi-log
+@(,,755) sbin/freesense-zfs-notices
 @(,,755) sbin/gmirror_status_check.php
 @(,,755) sbin/kmemusage.sh
 sbin/mpd.script
@@ -540,6 +542,7 @@ www/csrf_error.php
 www/css/_freesense-bs5-shim.css
 www/css/_freesense-components.css
 www/css/_freesense-core.css
+www/css/_freesense-dashboard.css
 www/css/_freesense-tokens.css
 www/css/fonts/LICENSE.txt
 www/css/fonts/Roboto-Black.woff2
@@ -665,6 +668,9 @@ www/js/FreeSenseHelpers.js
 www/js/fleet-join.js
 www/js/freesense-bs5-compat.js
 www/js/freesense-ui.js
+www/js/fs-chart.js
+www/js/fs-core.js
+www/js/fs-dashboard.js
 www/js/jquery-cookie-shim.js
 www/js/polyfills.js
 www/js/traffic-graphs.js
@@ -875,6 +881,9 @@ www/vendor/nvd3/nv.d3.min.js.map
 www/vendor/sortable/LICENSE
 www/vendor/sortable/sortable-theme-bootstrap.css
 www/vendor/sortable/sortable.js
+www/vendor/uplot/LICENSE
+www/vendor/uplot/uPlot.iife.min.js
+www/vendor/uplot/uPlot.min.css
 www/vendor/visibility/LICENSE
 www/vendor/visibility/visibility-2.0.2.js
 www/vpn_ipsec.php
@@ -890,54 +899,28 @@ www/vpn_l2tp_users_edit.php
 www/vpn_openvpn_client.php
 www/vpn_openvpn_csc.php
 www/vpn_openvpn_server.php
-www/widgets/include/captiveportal.inc
-www/widgets/include/carp_status.inc
-www/widgets/include/disks.inc
-www/widgets/include/dyn_dns_status.inc
-www/widgets/include/gateways.inc
-www/widgets/include/gmirror_status.inc
-www/widgets/include/installed_packages.inc
-www/widgets/include/interface_statistics.inc
-www/widgets/include/interfaces.inc
-www/widgets/include/ipsec.inc
-www/widgets/include/log.inc
-www/widgets/include/ntp_status.inc
-www/widgets/include/openvpn.inc
-www/widgets/include/picture.inc
-www/widgets/include/rss.inc
-www/widgets/include/services_status.inc
-www/widgets/include/smart_status.inc
-www/widgets/include/system_information.inc
-www/widgets/include/thermal_sensors.inc
-www/widgets/include/traffic_graph.inc
-www/widgets/include/wake_on_lan.inc
-www/widgets/include/zfs_storage.inc
-www/widgets/javascript/cpu_graphs.js
-www/widgets/javascript/ipsec.js
-www/widgets/javascript/thermal_sensors.js
-www/widgets/javascript/traffic_graph.js
-www/widgets/widgets/captive_portal_status.widget.php
-www/widgets/widgets/carp_status.widget.php
-www/widgets/widgets/disks.widget.php
-www/widgets/widgets/dyn_dns_status.widget.php
-www/widgets/widgets/gateways.widget.php
-www/widgets/widgets/gmirror_status.widget.php
-www/widgets/widgets/installed_packages.widget.php
-www/widgets/widgets/interface_statistics.widget.php
-www/widgets/widgets/interfaces.widget.php
-www/widgets/widgets/ipsec.widget.php
-www/widgets/widgets/log.widget.php
-www/widgets/widgets/ntp_status.widget.php
-www/widgets/widgets/openvpn.widget.php
-www/widgets/widgets/picture.widget.php
-www/widgets/widgets/rss.widget.php
-www/widgets/widgets/services_status.widget.php
-www/widgets/widgets/smart_status.widget.php
-www/widgets/widgets/system_information.widget.php
-www/widgets/widgets/thermal_sensors.widget.php
-www/widgets/widgets/traffic_graphs.widget.php
-www/widgets/widgets/wake_on_lan.widget.php
-www/widgets/widgets/zfs_storage.widget.php
+www/widgets/gateways.js
+www/widgets/gateways.widget.json
+www/widgets/interface-detail.js
+www/widgets/interface-detail.widget.json
+www/widgets/interfaces.js
+www/widgets/interfaces.widget.json
+www/widgets/notices.js
+www/widgets/notices.widget.json
+www/widgets/resources.js
+www/widgets/resources.widget.json
+www/widgets/services.js
+www/widgets/services.widget.json
+www/widgets/storage.js
+www/widgets/storage.widget.json
+www/widgets/system.js
+www/widgets/system.widget.json
+www/widgets/thermal.js
+www/widgets/thermal.widget.json
+www/widgets/traffic.js
+www/widgets/traffic.widget.json
+www/widgets/zfs.js
+www/widgets/zfs.widget.json
 www/wizard.php
 www/wizards/openvpn_wizard.inc
 www/wizards/openvpn_wizard.xml
