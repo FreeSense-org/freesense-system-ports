@@ -132,6 +132,7 @@
 /etc/inc/services.inc
 /etc/inc/shaper.inc
 /etc/inc/status_metrics.inc
+/etc/inc/status_nics.inc
 /etc/inc/syslog.inc
 /etc/inc/system.inc
 /etc/inc/tools_for_debugging_n_testing.inc

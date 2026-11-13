@@ -2669,6 +2669,9 @@ PHP_FUNCTION(FreeSense_get_interface_stats)
 	add_assoc_double(return_value, "inmcasts", (double)tmpd->ifi_imcasts);
 	add_assoc_double(return_value, "outmcasts", (double)tmpd->ifi_omcasts);
 	add_assoc_double(return_value, "unsuppproto", (double)tmpd->ifi_noproto);
+	add_assoc_double(return_value, "iqdrops", (double)tmpd->ifi_iqdrops);
+	add_assoc_double(return_value, "oqdrops", (double)tmpd->ifi_oqdrops);
+	add_assoc_double(return_value, "baudrate", (double)tmpd->ifi_baudrate);
 	add_assoc_long(return_value, "mtu", (long)tmpd->ifi_mtu);
 }
 
