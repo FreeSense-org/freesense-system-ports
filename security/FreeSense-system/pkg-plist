@@ -134,6 +134,7 @@
 /etc/inc/status_metrics.inc
 /etc/inc/status_nics.inc
 /etc/inc/syslog.inc
+/etc/inc/sysstat.inc
 /etc/inc/system.inc
 /etc/inc/tools_for_debugging_n_testing.inc
 /etc/inc/unbound.inc
@@ -262,7 +263,6 @@
 bin/captiveportal_gather_stats.php
 bin/dhcpd_gather_stats.php
 @(,,755) bin/easyrule
-@(,,755) bin/filterparser.php
 bin/iftop_parse.awk
 @(,,755) bin/iftop_parser.sh
 @(,,755) bin/ipsec_keepalive.php
@@ -270,14 +270,9 @@ bin/iftop_parse.awk
 @(,,755) bin/kea2unbound
 @(,,755) bin/mail.php
 @(,,755) bin/notify_monitor.php
-@(,,755) bin/parser_dhcpv6_leases_tester.php
-@(,,755) bin/parser_ipv6_tester.php
-bin/parser_readme.md
 @(,,755) bin/pfSlogcat
 @(,,755) bin/ping_hosts.sh
-@(,,755) bin/runmsntp.sh
 @(,,755) bin/usermgrpasswd
-@(,,755) bin/usermgrwhoami
 @(,,755) bin/viconfig
 captiveportal/captiveportal-default-logo.png
 captiveportal/index.php
@@ -353,6 +348,7 @@ pkg/miniupnpd.xml
 @(,,755) sbin/freesense-join
 @(,,755) sbin/freesense-remote-backup
 @(,,755) sbin/freesense-restapi-log
+@(,,755) sbin/freesense-sysstatd
 @(,,755) sbin/freesense-zfs-notices
 @(,,755) sbin/gmirror_status_check.php
 @(,,755) sbin/kmemusage.sh
@@ -377,7 +373,6 @@ sbin/openvpn_connect_async.php
 sbin/prefixes.php
 @(,,755) sbin/read_global_var
 @(,,755) sbin/read_xml_tag.sh
-@(,,755) sbin/show_filter_reload_status.php
 @(,,755) sbin/strongswanrc
 @(,,755) sbin/ufslabels.sh
 @(,,755) sbin/vpn-linkdown
@@ -620,7 +615,6 @@ www/firewall_virtual_ip_edit.php
 www/foot.inc
 www/getqueuestats.php
 www/getserviceproviders.php
-www/getstats.php
 www/graph.php
 www/guiconfig.inc
 www/head.inc
@@ -735,7 +729,6 @@ www/services_wol.php
 www/services_wol_edit.php
 www/shortcuts.inc
 www/shortcuts/pkg_upnp.inc
-www/stats.php
 www/status.php
 www/status_captiveportal.php
 www/status_captiveportal_expire.php
