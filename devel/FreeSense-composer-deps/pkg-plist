@@ -497,7 +497,9 @@ FreeSense/include/vendor/symfony/polyfill-mbstring/LICENSE
 FreeSense/include/vendor/symfony/polyfill-mbstring/Mbstring.php
 FreeSense/include/vendor/symfony/polyfill-mbstring/README.md
 FreeSense/include/vendor/symfony/polyfill-mbstring/Resources/unidata/caseFolding.php
+FreeSense/include/vendor/symfony/polyfill-mbstring/Resources/unidata/eastAsianWidthRegexp.php
 FreeSense/include/vendor/symfony/polyfill-mbstring/Resources/unidata/lowerCase.php
+FreeSense/include/vendor/symfony/polyfill-mbstring/Resources/unidata/titleCase.php
 FreeSense/include/vendor/symfony/polyfill-mbstring/Resources/unidata/titleCaseRegexp.php
 FreeSense/include/vendor/symfony/polyfill-mbstring/Resources/unidata/upperCase.php
 FreeSense/include/vendor/symfony/polyfill-mbstring/bootstrap.php

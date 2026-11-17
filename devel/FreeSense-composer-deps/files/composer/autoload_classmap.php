@@ -472,8 +472,6 @@ return array(
     'Symfony\\Polyfill\\Intl\\Normalizer\\Normalizer' => $vendorDir . '/symfony/polyfill-intl-normalizer/Normalizer.php',
     'Symfony\\Polyfill\\Mbstring\\Mbstring' => $vendorDir . '/symfony/polyfill-mbstring/Mbstring.php',
     'Symfony\\Polyfill\\Php85\\Php85' => $vendorDir . '/symfony/polyfill-php85/Php85.php',
-    'Tools\\Rector\\Rector\\Rules\\ArrayGetExprRector' => $baseDir . '/tools/rector/src/Rector/Rules/ArrayGetExprRector.php',
-    'Tools\\Rector\\Tests\\Rector\\ArrayGetExprRector\\ArrayGetExprRectorTest' => $baseDir . '/tools/rector/tests/Rector/ArrayGetExprRector/ArrayGetExprRectorTest.php',
     'mikehaertl\\shellcommand\\Command' => $vendorDir . '/mikehaertl/php-shellcommand/src/Command.php',
     '©' => $vendorDir . '/symfony/cache/Traits/ValueWrapper.php',
 );
