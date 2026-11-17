@@ -23,6 +23,7 @@ RUN_DEPENDS=	bind-tools>=0:dns/bind-tools \
 		dhcpleases6>=0:sysutils/dhcpleases6 \
 		dnsmasq>=0:dns/dnsmasq \
 		dpinger>=0:net/dpinger \
+		expat>=2.10.0:textproc/expat2 \
 		expiretable>=0:security/expiretable \
 		filterdns>=0:net/filterdns \
 		filterlog>=0:sysutils/filterlog \
@@ -49,7 +50,7 @@ RUN_DEPENDS=	bind-tools>=0:dns/bind-tools \
 		${PHP_PKGNAMEPREFIX}pear-Net_IPv6>=0:net/pear-Net_IPv6@${PHP_FLAVOR} \
 		${PHP_PKGNAMEPREFIX}pear-XML_RPC2>=0:net/pear-XML_RPC2@${PHP_FLAVOR} \
 		${PHP_PKGNAMEPREFIX}FreeSense-module>=0:devel/php-FreeSense-module@${PHP_FLAVOR} \
-		${PHP_PKGNAMEPREFIX}phpseclib>=0:security/phpseclib@${PHP_FLAVOR} \
+		${PHP_PKGNAMEPREFIX}phpseclib>=2.0.56:security/phpseclib@${PHP_FLAVOR} \
 		FreeSense-Status_Monitoring${PHP_PKGNAMESUFFIX}>=0:sysutils/FreeSense-Status_Monitoring@${PHP_FLAVOR} \
 		FreeSense-composer-deps>=0:devel/FreeSense-composer-deps \
 		FreeSense-upgrade>=0:sysutils/FreeSense-upgrade \
