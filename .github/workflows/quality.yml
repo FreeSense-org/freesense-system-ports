@@ -39,6 +39,11 @@ jobs:
           ref: ${{ steps.source.outputs.ref }}
       - name: FreeSense-system pkg-plist matches the source tree
         run: python3 tools/system_plist_audit.py --source freesense-src
+      - name: Audit the actual shipped Composer inventory
+        run: |
+          python3 -m unittest -v tests/test_composer_runtime_inventory.py
+          python3 tools/composer_runtime_inventory.py --source-lock freesense-src/composer.lock --output "${RUNNER_TEMP}/runtime-composer"
+          docker run --rm -v "${RUNNER_TEMP}/runtime-composer:/app:ro" -w /app composer:2 audit --locked --no-dev --no-interaction
       - name: Reject credentials
         run: |
           if git grep -IEn '(^[[:space:]]*-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----[[:space:]]*$|R2_SECRET_ACCESS_KEY[=:][[:space:]]*[^$<{])'; then
