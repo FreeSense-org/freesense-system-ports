@@ -27,5 +27,5 @@ return array(
     'Psr\\Container\\' => array($vendorDir . '/psr/container/src'),
     'Psr\\Cache\\' => array($vendorDir . '/psr/cache/src'),
     'Nette\\' => array($vendorDir . '/nette/utils/src'),
-    'FreeSense\\' => array('//usr/local/FreeSense/include'),
+    'FreeSense\\' => array($baseDir . '/../usr/local/FreeSense/include'),
 );
